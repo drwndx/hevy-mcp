@@ -38,7 +38,9 @@
 
 ## Architecture
 - Separate MCP handlers, API clients, domain logic,
-  models, and configuration.
+  models, and configuration. The single-file layout of
+  `hevy-mcp/index.mjs` is intentional for now; the module split
+  (P8 in `docs/tooling-plan.md`) is deferred.
 - Favor dependency injection where it improves testing.
 - Keep functions cohesive and modules loosely coupled.
 - Avoid circular dependencies and hidden global state.
@@ -67,3 +69,30 @@
 - Never claim tests passed unless they were executed.
 - Do not silently suppress exceptions or failing tests.
 - Document behavior changes and compatibility risks.
+- CI (`.github/workflows/ci.yml`) must pass: lint, format check,
+  typecheck, tests, `npm audit`, and gitleaks. Dependabot bumps
+  the SHA-pinned action versions.
+
+## Project Specifics (hevy-mcp)
+- The server is `hevy-mcp/index.mjs`, plain JavaScript (ES modules).
+  Do not convert to TypeScript.
+- Run from `hevy-mcp`: `npm test`, `npx eslint .`,
+  `npx tsc -p tsconfig.json`, `npx prettier --check .`.
+- `test/tools.snapshot.json` pins all 22 tools. Never regenerate it
+  (`UPDATE_SNAPSHOT=1`) without approval.
+- Writes are disabled unless `HEVY_ENABLE_WRITES=1`. Never make live
+  mutating Hevy calls; tests use only the local fake API.
+- Never print or open `hevy-mcp/.env`, and never log `HEVY_API_KEY`.
+- Tool results: the first content block is redacted JSON; the second
+  is an untrusted-content notice. Parse only the first block.
+- stdout is MCP protocol only. Diagnostics go to stderr as JSON
+  lines, each tool call carrying a `requestId`.
+- Only GETs are retried (502/503/504, max 2). Writes are never
+  retried; a write timeout reports "outcome unknown".
+
+## Environment Gotchas
+- Windows PowerShell has no `&&`; chain with `;` and `if ($?)`.
+- Do not rewrite source files with `Get-Content`/`Set-Content`; it
+  corrupts UTF-8 characters and CRLF. Use the edit tool.
+- Tests that trip the circuit breaker need their own `connect()`
+  so they don't affect the shared client.
