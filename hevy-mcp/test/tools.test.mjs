@@ -821,8 +821,10 @@ async function runServer(env, { args = [], closeStdin = false, ms = 800 } = {}) 
 
 test("each untrusted result carries a fresh nonce notice and leaves the data block unchanged", async () => {
   nextResponse = { status: 200, body: { ok: true } };
-  const a = await client.callTool({ name: "hevy_get_user_info", arguments: {} });
-  const b = await client.callTool({ name: "hevy_get_user_info", arguments: {} });
+  const c = await connect();
+  const a = await c.callTool({ name: "hevy_get_user_info", arguments: {} });
+  const b = await c.callTool({ name: "hevy_get_user_info", arguments: {} });
+  await c.close();
   const ca = /** @type {any} */ (a.content);
   const cb = /** @type {any} */ (b.content);
   assert.deepEqual(JSON.parse(ca[0].text), { ok: true });
