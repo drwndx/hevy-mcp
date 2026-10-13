@@ -45,6 +45,10 @@ try {
   process.exit(1);
 }
 
+const RETRYABLE = new Set([502, 503, 504]);
+const GET_RETRIES = 2;
+const RETRY_BASE_MS =
+  Number(process.env.HEVY_RETRY_BASE_MS) >= 0 && process.env.HEVY_RETRY_BASE_MS ? Number(process.env.HEVY_RETRY_BASE_MS) : 300;
 const TIMEOUT_MS = Number(process.env.HEVY_TIMEOUT_MS) > 0 ? Number(process.env.HEVY_TIMEOUT_MS) : 15_000;
 const MAX_RESPONSE_CHARS = 100_000;
 
@@ -544,17 +548,27 @@ async function callTool(name, args = {}, meta = {}) {
   let res, body, truncatedUpstream;
   try {
     ({ res, body, truncatedUpstream } = await withSlot(async () => {
-      const res = await fetch(url, {
-        method: tool.method,
-        redirect: "error", // never forward the api-key header to a redirect target
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-        headers: {
-          "api-key": apiKey,
-          accept: "application/json",
-          ...(tool.hasBody ? { "content-type": "application/json" } : {}),
-        },
-        body: tool.hasBody ? JSON.stringify(args.body) : undefined,
-      });
+      const send = () =>
+        fetch(url, {
+          method: tool.method,
+          redirect: "error", // never forward the api-key header to a redirect target
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+          headers: {
+            "api-key": apiKey,
+            accept: "application/json",
+            ...(tool.hasBody ? { "content-type": "application/json" } : {}),
+          },
+          body: tool.hasBody ? JSON.stringify(args.body) : undefined,
+        });
+      let res = await send();
+      // Only idempotent GETs are retried, only on gateway-style 502/503/504, at most GET_RETRIES times.
+      for (let attempt = 1; tool.method === "GET" && RETRYABLE.has(res.status) && attempt <= GET_RETRIES; attempt++) {
+        await res.body?.cancel();
+        const secs = Number(res.headers.get("retry-after"));
+        const wait = Math.min(Number.isFinite(secs) && secs > 0 ? secs * 1000 : RETRY_BASE_MS * 2 ** (attempt - 1), 5000);
+        await new Promise((r) => setTimeout(r, wait + Math.random() * RETRY_BASE_MS));
+        res = await send();
+      }
       meta.status = res.status;
       return { res, ...(await readCapped(res)) };
     }));
@@ -668,4 +682,8 @@ process.on("unhandledRejection", (e) => {
 });
 
 await server.connect(new StdioServerTransport());
+// Hevy keys are UUIDs; warn (never echo the value) if it looks wrong, but don't refuse to start.
+if (process.env.HEVY_API_KEY && !/^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(process.env.HEVY_API_KEY.trim())) {
+  log("warn", "api_key_unexpected_shape", { hint: "HEVY_API_KEY is not UUID-shaped; check for stray quotes or whitespace" });
+}
 log("info", "ready", { tools: tools.size, writes: WRITES_ENABLED, apiKeyPresent: Boolean(process.env.HEVY_API_KEY) });

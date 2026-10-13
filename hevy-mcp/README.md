@@ -29,3 +29,11 @@ MCP server covering the full [Hevy public API](https://api.hevyapp.com/docs/). T
 - **Audit log.** Every tool call is appended to `audit.log` (JSONL, next to `index.mjs`; gitignored): timestamp, tool, method, path template, params, outcome (`ok`, `http_error`, `invalid_arguments`, `rate_limited`, `circuit_open`, `request_failed`, `unknown_or_disabled_tool`), HTTP status, duration, and for writes a SHA-256 and size of the body. It never contains the API key or bodies. Entries are hash-chained: run `npm run verify-audit` to detect edited or deleted lines (it can't detect a wholesale rewrite, so copy the log off-machine if that matters). Set `HEVY_AUDIT_LOG=<path>` to relocate it or `off` to disable. The server doesn't rotate it; starting a new file starts a new chain. Example: `Select-String '"write":true' audit.log`.
 - Only open workspaces you trust. A cloned repo's `.mcp.json` can launch arbitrary commands.
 - Rotate the key in Hevy if it ever appears in a chat, log, or screenshot.
+
+## Development checks
+
+`npm run lint`, `npm run format:check`, `npm run typecheck`, `npm test` (offline; uses a local fake API) and `npm audit`. CI runs the same.
+
+Optional secret-scan pre-commit hook (requires [gitleaks](https://github.com/gitleaks/gitleaks)): create `.git/hooks/pre-commit` containing `gitleaks protect --staged --redact`.
+
+Idempotent GET requests are retried up to twice on 502/503/504 (honouring `Retry-After`, capped at 5s). Writes are never retried. `HEVY_RETRY_BASE_MS` tunes the backoff.

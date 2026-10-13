@@ -24,7 +24,12 @@ function startFake() {
       req.on("data", (c) => (data += c));
       req.on("end", () => {
         requests.push({ method: req.method, url: req.url, headers: req.headers, body: data });
-        const { status, body, raw, contentType, empty, hang, headers } = nextResponse;
+        const { body, raw, contentType, empty, hang, headers } = nextResponse;
+        let { status } = nextResponse;
+        if (nextResponse.flaky > 0) {
+          nextResponse.flaky--;
+          status = 503;
+        }
         inflight++;
         maxInflight = Math.max(maxInflight, inflight);
         res.on("close", () => inflight--);
@@ -751,6 +756,42 @@ test("a 2xx with a JSON content-type but an invalid body is an error, not succes
     nextResponse = { status: 200, contentType: "application/json", raw: "{not json" };
     const res = await c.callTool({ name: "hevy_get_user_info", arguments: {} });
     assert.equal(res.isError, true);
+  } finally {
+    await c.close();
+  }
+});
+
+test("GET retries a transient 503 up to twice; 500 is not retried", async () => {
+  const c = await connect({ HEVY_RETRY_BASE_MS: "1" });
+  try {
+    nextResponse = { status: 200, body: { ok: true }, flaky: 2 };
+    requests = [];
+    let res = await c.callTool({ name: "hevy_get_user_info", arguments: {} });
+    assert.ok(!res.isError);
+    assert.equal(requests.length, 3);
+    nextResponse = { status: 200, body: { ok: true }, flaky: 5 };
+    requests = [];
+    res = await c.callTool({ name: "hevy_get_user_info", arguments: {} });
+    assert.equal(res.isError, true);
+    assert.equal(requests.length, 3);
+    nextResponse = { status: 500, body: { error: "x" } };
+    requests = [];
+    await c.callTool({ name: "hevy_get_user_info", arguments: {} });
+    assert.equal(requests.length, 1);
+  } finally {
+    await c.close();
+  }
+});
+
+test("writes are never retried on 503", async () => {
+  const c = await connect({ HEVY_RETRY_BASE_MS: "1" });
+  try {
+    const [name, args] = CASES.find((c) => c[2] === "POST");
+    nextResponse = { status: 200, body: { ok: true }, flaky: 1 };
+    requests = [];
+    const res = await c.callTool({ name, arguments: args });
+    assert.equal(res.isError, true);
+    assert.equal(requests.length, 1);
   } finally {
     await c.close();
   }
