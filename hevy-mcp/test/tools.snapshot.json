@@ -1,0 +1,1424 @@
+[
+  {
+    "name": "hevy_create_body_measurement",
+    "description": "Create a body measurement entry for a given date. Returns 409 if an entry already exists for that date. [POST /v1/body_measurements]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "type": "object",
+          "properties": {
+            "date": {
+              "type": "string",
+              "format": "date"
+            },
+            "weight_kg": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "lean_mass_kg": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "fat_percent": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "neck_cm": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "shoulder_cm": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "chest_cm": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "left_bicep_cm": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "right_bicep_cm": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "left_forearm_cm": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "right_forearm_cm": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "abdomen": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "waist": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "hips": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "left_thigh": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "right_thigh": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "left_calf": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "right_calf": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "date"
+          ],
+          "additionalProperties": false,
+          "description": "JSON request body"
+        }
+      },
+      "required": [
+        "body"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "hevy_create_exercise_template",
+    "description": "Create a new custom exercise template. [POST /v1/exercise_templates]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "type": "object",
+          "properties": {
+            "exercise": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "The title of the exercise template."
+                },
+                "exercise_type": {
+                  "type": "string",
+                  "enum": [
+                    "weight_reps",
+                    "reps_only",
+                    "bodyweight_reps",
+                    "bodyweight_assisted_reps",
+                    "duration",
+                    "weight_duration",
+                    "distance_duration",
+                    "short_distance_weight"
+                  ]
+                },
+                "equipment_category": {
+                  "type": "string",
+                  "enum": [
+                    "none",
+                    "barbell",
+                    "dumbbell",
+                    "kettlebell",
+                    "machine",
+                    "plate",
+                    "resistance_band",
+                    "suspension",
+                    "other"
+                  ]
+                },
+                "muscle_group": {
+                  "type": "string",
+                  "enum": [
+                    "abdominals",
+                    "shoulders",
+                    "biceps",
+                    "triceps",
+                    "forearms",
+                    "quadriceps",
+                    "hamstrings",
+                    "calves",
+                    "glutes",
+                    "abductors",
+                    "adductors",
+                    "lats",
+                    "upper_back",
+                    "traps",
+                    "lower_back",
+                    "chest",
+                    "cardio",
+                    "neck",
+                    "full_body",
+                    "other"
+                  ]
+                },
+                "other_muscles": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "abdominals",
+                      "shoulders",
+                      "biceps",
+                      "triceps",
+                      "forearms",
+                      "quadriceps",
+                      "hamstrings",
+                      "calves",
+                      "glutes",
+                      "abductors",
+                      "adductors",
+                      "lats",
+                      "upper_back",
+                      "traps",
+                      "lower_back",
+                      "chest",
+                      "cardio",
+                      "neck",
+                      "full_body",
+                      "other"
+                    ]
+                  },
+                  "description": "The other muscles of the exercise template."
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "exercise"
+          ],
+          "additionalProperties": false,
+          "description": "JSON request body"
+        }
+      },
+      "required": [
+        "body"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "hevy_create_routine",
+    "description": "Create a new routine [POST /v1/routines]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "type": "object",
+          "properties": {
+            "routine": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "The title of the routine."
+                },
+                "folder_id": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "The folder id the routine should be added to. Pass null to insert the routine into default \"My Routines\" folder"
+                },
+                "notes": {
+                  "type": "string",
+                  "description": "Additional notes for the routine."
+                },
+                "exercises": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "exercise_template_id": {
+                        "type": "string",
+                        "description": "The ID of the exercise template."
+                      },
+                      "superset_id": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "description": "The ID of the superset."
+                      },
+                      "rest_seconds": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "description": "The rest time in seconds."
+                      },
+                      "notes": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "Additional notes for the exercise."
+                      },
+                      "sets": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "description": "The type of the set.",
+                              "enum": [
+                                "warmup",
+                                "normal",
+                                "failure",
+                                "dropset"
+                              ]
+                            },
+                            "weight_kg": {
+                              "type": [
+                                "number",
+                                "null"
+                              ],
+                              "description": "The weight in kilograms."
+                            },
+                            "reps": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "description": "The number of repetitions."
+                            },
+                            "distance_meters": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "description": "The distance in meters."
+                            },
+                            "duration_seconds": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "description": "The duration in seconds."
+                            },
+                            "custom_metric": {
+                              "type": [
+                                "number",
+                                "null"
+                              ],
+                              "description": "A custom metric for the set. Currently used for steps and floors."
+                            },
+                            "rep_range": {
+                              "type": [
+                                "object",
+                                "null"
+                              ],
+                              "description": "Range of reps for the set, if applicable",
+                              "properties": {
+                                "start": {
+                                  "type": "number",
+                                  "description": "Starting rep count for the range"
+                                },
+                                "end": {
+                                  "type": "number",
+                                  "description": "Ending rep count for the range"
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false,
+          "description": "JSON request body"
+        }
+      },
+      "required": [
+        "body"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "hevy_create_routine_folder",
+    "description": "Create a new routine folder. The folder will be created at index 0, and all other folders will have their indexes incremented. [POST /v1/routine_folders]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "type": "object",
+          "properties": {
+            "routine_folder": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "The title of the routine folder."
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false,
+          "description": "JSON request body"
+        }
+      },
+      "required": [
+        "body"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "hevy_create_workout",
+    "description": "Create a new workout [POST /v1/workouts]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "type": "object",
+          "properties": {
+            "workout": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "The title of the workout."
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "A description for the workout workout."
+                },
+                "start_time": {
+                  "type": "string",
+                  "description": "The time the workout started."
+                },
+                "end_time": {
+                  "type": "string",
+                  "description": "The time the workout ended."
+                },
+                "is_private": {
+                  "type": "boolean",
+                  "description": "A boolean indicating if the workout is private. Optional - defaults to false when omitted.",
+                  "default": false
+                },
+                "exercises": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "exercise_template_id": {
+                        "type": "string",
+                        "description": "The ID of the exercise template."
+                      },
+                      "superset_id": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "description": "The ID of the superset."
+                      },
+                      "notes": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "Additional notes for the exercise."
+                      },
+                      "sets": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "description": "The type of the set.",
+                              "enum": [
+                                "warmup",
+                                "normal",
+                                "failure",
+                                "dropset"
+                              ]
+                            },
+                            "weight_kg": {
+                              "type": [
+                                "number",
+                                "null"
+                              ],
+                              "description": "The weight in kilograms."
+                            },
+                            "reps": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "description": "The number of repetitions."
+                            },
+                            "distance_meters": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "description": "The distance in meters."
+                            },
+                            "duration_seconds": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "description": "The duration in seconds."
+                            },
+                            "custom_metric": {
+                              "type": [
+                                "number",
+                                "null"
+                              ],
+                              "description": "A custom metric for the set. Currently used for steps and floors."
+                            },
+                            "rpe": {
+                              "type": [
+                                "number",
+                                "null"
+                              ],
+                              "description": "The Rating of Perceived Exertion (RPE).",
+                              "enum": [
+                                6,
+                                7,
+                                7.5,
+                                8,
+                                8.5,
+                                9,
+                                9.5,
+                                10
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "title",
+                "start_time",
+                "end_time",
+                "exercises"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "workout"
+          ],
+          "additionalProperties": false,
+          "description": "JSON request body"
+        }
+      },
+      "required": [
+        "body"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "hevy_get_body_measurement",
+    "description": "Get a single body measurement by date [GET /v1/body_measurements/{date}]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date",
+          "description": "The date of the body measurement (YYYY-MM-DD)"
+        }
+      },
+      "required": [
+        "date"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "hevy_get_body_measurements",
+    "description": "Get a paginated list of body measurements for the authenticated user [GET /v1/body_measurements]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "integer",
+          "default": 1,
+          "description": "Page number (Must be 1 or greater)"
+        },
+        "pageSize": {
+          "type": "integer",
+          "default": 10,
+          "maximum": 10,
+          "description": "Number of items per page (Max 10)"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "hevy_get_exercise_history",
+    "description": "Get exercise history for a specific exercise template [GET /v1/exercise_history/{exerciseTemplateId}]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "exerciseTemplateId": {
+          "description": "The id of the exercise template"
+        },
+        "start_date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Optional start date for filtering exercise history (ISO 8601 format)"
+        },
+        "end_date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Optional end date for filtering exercise history (ISO 8601 format)"
+        }
+      },
+      "required": [
+        "exerciseTemplateId"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "hevy_get_exercise_template",
+    "description": "Get a single exercise template by id. [GET /v1/exercise_templates/{exerciseTemplateId}]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "exerciseTemplateId": {
+          "description": "The id of the exercise template"
+        }
+      },
+      "required": [
+        "exerciseTemplateId"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "hevy_get_exercise_templates",
+    "description": "Get a paginated list of exercise templates available on the account. [GET /v1/exercise_templates]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "integer",
+          "default": 1,
+          "description": "Page number (Must be 1 or greater)"
+        },
+        "pageSize": {
+          "type": "integer",
+          "default": 100,
+          "maximum": 100,
+          "description": "Number of items on the requested page (Max 100)"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "hevy_get_routine",
+    "description": "Get a routine by its Id [GET /v1/routines/{routineId}]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "routineId": {
+          "description": "The id of the routine"
+        }
+      },
+      "required": [
+        "routineId"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "hevy_get_routine_folder",
+    "description": "Get a single routine folder by id. [GET /v1/routine_folders/{folderId}]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "folderId": {
+          "description": "The id of the routine folder"
+        }
+      },
+      "required": [
+        "folderId"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "hevy_get_routine_folders",
+    "description": "Get a paginated list of routine folders available on the account. [GET /v1/routine_folders]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "integer",
+          "default": 1,
+          "description": "Page number (Must be 1 or greater)"
+        },
+        "pageSize": {
+          "type": "integer",
+          "default": 10,
+          "maximum": 10,
+          "description": "Number of items on the requested page (Max 10)"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "hevy_get_routines",
+    "description": "Get a paginated list of routines [GET /v1/routines]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "integer",
+          "default": 1,
+          "description": "Page number (Must be 1 or greater)"
+        },
+        "pageSize": {
+          "type": "integer",
+          "default": 10,
+          "maximum": 10,
+          "description": "Number of items on the requested page (Max 10)"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "hevy_get_user_info",
+    "description": "Get user info [GET /v1/user/info]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "hevy_get_workout",
+    "description": "Get a single workout’s complete details by the workoutId [GET /v1/workouts/{workoutId}]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workoutId": {
+          "description": "The id of the workout"
+        }
+      },
+      "required": [
+        "workoutId"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "hevy_get_workout_count",
+    "description": "Get the total number of workouts on the account [GET /v1/workouts/count]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "hevy_get_workout_events",
+    "description": "Retrieve a paged list of workout events (updates or deletes) since a given date. Events are ordered from newest to oldest. The intention is to allow clients to keep their local cache of workouts up to date without having to fetch the entire list of workouts. — Returns a paginated array of workout events, indicating updates or deletions. [GET /v1/workouts/events]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "integer",
+          "default": 1,
+          "description": "Page number (Must be 1 or greater)"
+        },
+        "pageSize": {
+          "type": "integer",
+          "default": 10,
+          "maximum": 10,
+          "description": "Number of items on the requested page (Max 10)"
+        },
+        "since": {
+          "type": "string",
+          "default": "1970-01-01T00:00:00Z"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "hevy_get_workouts",
+    "description": "Get a paginated list of workouts [GET /v1/workouts]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "integer",
+          "default": 1,
+          "description": "Page number (Must be 1 or greater)"
+        },
+        "pageSize": {
+          "type": "integer",
+          "default": 10,
+          "maximum": 10,
+          "description": "Number of items on the requested page (Max 10)"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "hevy_update_body_measurement",
+    "description": "Update an existing body measurement entry for a given date. All fields are overwritten; omitted fields are set to null. [PUT /v1/body_measurements/{date}]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date",
+          "description": "The date of the measurement to update (YYYY-MM-DD)"
+        },
+        "body": {
+          "type": "object",
+          "properties": {
+            "weight_kg": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "lean_mass_kg": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "fat_percent": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "neck_cm": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "shoulder_cm": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "chest_cm": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "left_bicep_cm": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "right_bicep_cm": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "left_forearm_cm": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "right_forearm_cm": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "abdomen": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "waist": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "hips": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "left_thigh": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "right_thigh": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "left_calf": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "right_calf": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "description": "JSON request body"
+        }
+      },
+      "required": [
+        "date",
+        "body"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "hevy_update_routine",
+    "description": "Update an existing routine [PUT /v1/routines/{routineId}]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "routineId": {
+          "description": "The id of the routine"
+        },
+        "body": {
+          "type": "object",
+          "properties": {
+            "routine": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "The title of the routine."
+                },
+                "folder_id": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "The folder id the routine should be added to. Pass null to insert the routine into default \"My Routines\" folder"
+                },
+                "notes": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Additional notes for the routine."
+                },
+                "exercises": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "exercise_template_id": {
+                        "type": "string",
+                        "description": "The ID of the exercise template."
+                      },
+                      "superset_id": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "description": "The ID of the superset."
+                      },
+                      "rest_seconds": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "description": "The rest time in seconds."
+                      },
+                      "notes": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "Additional notes for the exercise."
+                      },
+                      "sets": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "description": "The type of the set.",
+                              "enum": [
+                                "warmup",
+                                "normal",
+                                "failure",
+                                "dropset"
+                              ]
+                            },
+                            "weight_kg": {
+                              "type": [
+                                "number",
+                                "null"
+                              ],
+                              "description": "The weight in kilograms."
+                            },
+                            "reps": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "description": "The number of repetitions."
+                            },
+                            "distance_meters": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "description": "The distance in meters."
+                            },
+                            "duration_seconds": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "description": "The duration in seconds."
+                            },
+                            "custom_metric": {
+                              "type": [
+                                "number",
+                                "null"
+                              ],
+                              "description": "A custom metric for the set. Currently used for steps and floors."
+                            },
+                            "rep_range": {
+                              "type": [
+                                "object",
+                                "null"
+                              ],
+                              "description": "Range of reps for the set, if applicable",
+                              "properties": {
+                                "start": {
+                                  "type": [
+                                    "number",
+                                    "null"
+                                  ],
+                                  "description": "Starting rep count for the range"
+                                },
+                                "end": {
+                                  "type": [
+                                    "number",
+                                    "null"
+                                  ],
+                                  "description": "Ending rep count for the range"
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false,
+          "description": "JSON request body"
+        }
+      },
+      "required": [
+        "routineId",
+        "body"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "hevy_update_workout",
+    "description": "Update an existing workout [PUT /v1/workouts/{workoutId}]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workoutId": {
+          "description": "The id of the workout"
+        },
+        "body": {
+          "type": "object",
+          "properties": {
+            "workout": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "The title of the workout."
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "A description for the workout workout."
+                },
+                "start_time": {
+                  "type": "string",
+                  "description": "The time the workout started."
+                },
+                "end_time": {
+                  "type": "string",
+                  "description": "The time the workout ended."
+                },
+                "is_private": {
+                  "type": "boolean",
+                  "description": "A boolean indicating if the workout is private. Optional - defaults to false when omitted.",
+                  "default": false
+                },
+                "exercises": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "exercise_template_id": {
+                        "type": "string",
+                        "description": "The ID of the exercise template."
+                      },
+                      "superset_id": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "description": "The ID of the superset."
+                      },
+                      "notes": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "Additional notes for the exercise."
+                      },
+                      "sets": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "description": "The type of the set.",
+                              "enum": [
+                                "warmup",
+                                "normal",
+                                "failure",
+                                "dropset"
+                              ]
+                            },
+                            "weight_kg": {
+                              "type": [
+                                "number",
+                                "null"
+                              ],
+                              "description": "The weight in kilograms."
+                            },
+                            "reps": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "description": "The number of repetitions."
+                            },
+                            "distance_meters": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "description": "The distance in meters."
+                            },
+                            "duration_seconds": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "description": "The duration in seconds."
+                            },
+                            "custom_metric": {
+                              "type": [
+                                "number",
+                                "null"
+                              ],
+                              "description": "A custom metric for the set. Currently used for steps and floors."
+                            },
+                            "rpe": {
+                              "type": [
+                                "number",
+                                "null"
+                              ],
+                              "description": "The Rating of Perceived Exertion (RPE).",
+                              "enum": [
+                                6,
+                                7,
+                                7.5,
+                                8,
+                                8.5,
+                                9,
+                                9.5,
+                                10
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "title",
+                "start_time",
+                "end_time",
+                "exercises"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "workout"
+          ],
+          "additionalProperties": false,
+          "description": "JSON request body"
+        }
+      },
+      "required": [
+        "workoutId",
+        "body"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  }
+]

@@ -1,0 +1,9 @@
+node_modules/
+.env
+.env.*
+!.env.example
+hevy-mcp/.env
+hevy-mcp/.env.*
+!hevy-mcp/.env.example
+audit.log
+hevy-mcp/audit.log

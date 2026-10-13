@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "hevy": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["D:/vscode_projects/hevy/hevy-mcp/index.mjs"]
+    }
+  }
+}
