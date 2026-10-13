@@ -96,3 +96,79 @@
   corrupts UTF-8 characters and CRLF. Use the edit tool.
 - Tests that trip the circuit breaker need their own `connect()`
   so they don't affect the shared client.
+
+
+## Token Efficiency & Context Management
+
+### Core Principles
+- Treat tokens, tool calls, and context window space as limited resources.
+- Optimize for correctness per token, not simply minimum token count.
+- Use the minimum context necessary to complete the task safely.
+- Prefer concise, actionable responses over lengthy explanations.
+- Avoid repeating information already established in the conversation.
+- Do not sacrifice code quality, security, or correctness to save tokens.
+
+### Repository Exploration
+- Inspect only files relevant to the current task.
+- Use targeted filename and symbol searches before reading files.
+- Prefer scoped searches over repository-wide scans.
+- Do not repeatedly read files whose relevant contents are already known.
+- Exclude node_modules, dist, build, coverage, and generated files.
+- Read complete files only when necessary to understand dependencies.
+- Expand the search scope only when evidence justifies it.
+
+### Planning & Reasoning
+- For simple tasks, implement directly without extensive planning.
+- For complex tasks, produce a brief plan before implementation.
+- Keep reasoning focused on decisions affecting implementation.
+- Do not narrate routine tool calls or obvious implementation steps.
+- Ask clarifying questions only when essential information is missing.
+- Reuse established architectural decisions and conventions.
+- Avoid repeatedly reconsidering decisions without new evidence.
+
+### Code Generation
+- Generate only the code required for the requested change.
+- Prefer minimal, focused edits instead of rewriting entire files.
+- Avoid unrelated refactoring and formatting changes.
+- Reuse existing utilities, abstractions, and dependencies.
+- Do not generate duplicate implementations.
+- Avoid adding dependencies unless clearly justified.
+- Preserve existing behavior and public interfaces by default.
+
+### Tool Call Efficiency
+- Batch related independent operations when practical.
+- Avoid redundant searches, file reads, and tool executions.
+- Use focused tests during development.
+- Run broader regression suites when warranted by the change.
+- Do not repeatedly rerun successful checks without a reason.
+- Prefer targeted diagnostics over verbose command output.
+
+### Response Efficiency
+- Default to concise responses.
+- Summarize changes rather than reproducing entire files.
+- Show diffs or relevant snippets instead of complete source files.
+- Report only meaningful findings, decisions, and blockers.
+- Avoid lengthy introductory or concluding explanations.
+- Do not repeat the user's requirements unless clarification is needed.
+- When reporting tests, summarize pass/fail results and relevant errors.
+
+### Context Preservation
+- Maintain a concise understanding of current architecture.
+- Preserve important decisions, constraints, and unresolved issues.
+- Before context compaction, retain critical implementation details.
+- Do not retain irrelevant exploration history.
+- Prefer repository documentation for durable architectural knowledge.
+- Avoid loading large documentation files unless directly relevant.
+
+### Escalation Rules
+- Start with the least expensive reasonable investigation.
+- Expand exploration when uncertainty affects correctness or security.
+- Prioritize full validation for authentication, credentials,
+  external API mutations, MCP tool contracts, and data integrity.
+- Never omit essential tests or security checks solely to save tokens.
+
+### Completion Criteria
+- Stop when the requested task is implemented and sufficiently verified.
+- Do not perform speculative improvements after completing the task.
+- Report remaining risks briefly without implementing unrelated fixes.
+- Do not continue exploring once adequate evidence is available.
