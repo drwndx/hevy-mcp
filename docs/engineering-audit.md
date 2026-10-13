@@ -30,7 +30,7 @@ Labels: **[Verified]** reproduced or confirmed in code/tooling. **[Risk]** plaus
 |---|---|
 | Runtime | Node 22.20 (engines `>=20.12`), ESM, plain JavaScript, no build step, no types |
 | Dependencies | `@modelcontextprotocol/sdk`, `ajv`, `ajv-formats` (exact pins now; at audit time `^` ranges). `npm audit`: 0 vulnerabilities |
-| Architecture | Single file `index.mjs` (~360 lines at audit time; roughly 900 now): env/config, OpenAPI-to-tool generation, limits/rate/breaker, redaction, audit log, request dispatch, MCP wiring. Low-level SDK `Server` over stdio |
+| Architecture | Single file `index.mjs` (~360 lines at audit time; roughly 830 now): env/config, OpenAPI-to-tool generation, limits/rate/breaker, redaction, audit log, request dispatch, MCP wiring. Low-level SDK `Server` over stdio |
 | Tools | 22 generated at startup from `openapi.json` (14 GET, 5 POST, 3 PUT; no DELETE exists). Names from the `NAMES` map (L91). Input schema = inlined OpenAPI params + `body` |
 | Auth | `api-key` header from `HEVY_API_KEY`, loaded from `hevy-mcp/.env` (L14) or process env |
 | Egress | Single host `api.hevyapp.com` (pinned, L26), https-only, `redirect:"error"`, 15 s timeout |
