@@ -4,24 +4,24 @@ Scope: whole repository (repo root). Line numbers refer to [hevy-mcp/index.mjs](
 
 Labels: **[Verified]** reproduced or confirmed in code/tooling. **[Risk]** plausible, depends on conditions. **[Rec]** improvement, no defect.
 
-> **Status update (after the adversarial review A1-A12 and tooling plan P1-P7; CI green at `0c9a78b`, 72 offline tests).** This audit is a point-in-time record: the findings, line numbers and "Discovery summary" below describe the code **as audited** and are kept for history. Current status per finding is in the table below and in section 4. For remaining work see [remediation-plan.md](./remediation-plan.md).
+> **Status update (after the adversarial review A1-A12, tooling plan P1-P7 and open items W1, W2, W4-W8; CI green at `e9eea44`, 80 offline tests).** This audit is a point-in-time record: the findings, line numbers and "Discovery summary" below describe the code **as audited** and are kept for history. Current status per finding is in the table below and in section 4. For remaining work see [remediation-plan.md](./remediation-plan.md).
 >
 > | Finding | Status now |
 > |---|---|
 > | F1 path traversal | **Fixed** (A1): ids and dates validated before the URL is built |
 > | F2 ambiguous write outcome | **Fixed**: failed writes report "outcome unknown", never auto-retried |
-> | F3 audit chain fork | **Partly fixed**: a directory lock serialises appends across instances. Rotation and `chain_restart` are not implemented |
+> | F3 audit chain fork | **Fixed** (W4): a directory lock serialises appends; size-based rotation (`HEVY_AUDIT_MAX_BYTES`) writes a `chain_restart` record so the chain stays continuous |
 > | F4 `.env` permissions | **Accepted / out of scope** (owner decision) |
 > | F5 git, CI, gates | **Fixed**: git, CI (lint, format, typecheck, test, `npm audit`, gitleaks), Dependabot. The planted-secret negative check is not done |
 > | F6 429 / retry | **Fixed, differs from the recommendation**: 429 opens the breaker (not retried); GETs retry up to 2 times on 502/503/504 only, honouring `Retry-After` |
 > | F7 contract protection | **Fixed**: golden `test/tools.snapshot.json`, per-tool tests for all 22 tools |
 > | F8 response buffering | **Fixed**: streamed read with a byte ceiling |
-> | F9 validation order | **Not re-verified** |
-> | F10 error text detail | **Not re-verified** |
-> | F11 config handling | **Partly fixed**: API-key shape warning added. Invalid or unknown env values still fall back silently, and `intEnv` is unchanged |
+> | F9 validation order | **Verified, accepted** (W1): the breaker check runs before argument validation, so invalid calls show as paused while it is open. Pinned by a test |
+> | F10 error text detail | **Verified** (W1): test confirms a connection failure exposes no host or URL to the client |
+> | F11 config handling | **Fixed** (W2): invalid or unknown `HEVY_*` values and unknown allowed-tool names are logged as warnings by name (values never echoed); `--check` reports them |
 > | F12 structure, annotations | **Open, accepted**: single-file layout kept (P8 deferred); `tsc` checkJs added; PUT `destructiveHint:false` unchanged to preserve the contract |
-> | F13 observability | **Fixed**: `requestId` in audit and tool results, structured JSON logs on stderr. No metrics or exit summary |
-> | F14 prompt injection | **Open, accepted** (advisory control; A8 nonce delimiter not implemented) |
+> | F13 observability | **Fixed**: `requestId` in audit and tool results, structured JSON logs on stderr. An exit `summary` log (calls, outcomes, breaker trips, retries, uptime) was added (W7) |
+> | F14 prompt injection | **Mitigated** (W8): the notice carries a random per-call id; still an advisory control, writes off by default is the hard control |
 > | F15 supply chain | **Fixed**: exact pins, Dependabot, `.npmrc`, `npm ci` documented |
 
 ## 1. Discovery summary (verified at audit time; see status update above for changes)
@@ -29,8 +29,8 @@ Labels: **[Verified]** reproduced or confirmed in code/tooling. **[Risk]** plaus
 | Area | Finding |
 |---|---|
 | Runtime | Node 22.20 (engines `>=20.12`), ESM, plain JavaScript, no build step, no types |
-| Dependencies | `@modelcontextprotocol/sdk` ^1.32.1 (lock: 1.32.1), `ajv` ^8, `ajv-formats` ^3. `npm audit`: 0 vulnerabilities. `package.json` uses `^` ranges while `.npmrc` sets `save-exact` (affects only future installs) |
-| Architecture | Single file `index.mjs` (~360 lines): env/config, OpenAPI-to-tool generation, limits/rate/breaker, redaction, audit log, request dispatch, MCP wiring. Low-level SDK `Server` over stdio |
+| Dependencies | `@modelcontextprotocol/sdk`, `ajv`, `ajv-formats` (exact pins now; at audit time `^` ranges). `npm audit`: 0 vulnerabilities |
+| Architecture | Single file `index.mjs` (~360 lines at audit time; roughly 900 now): env/config, OpenAPI-to-tool generation, limits/rate/breaker, redaction, audit log, request dispatch, MCP wiring. Low-level SDK `Server` over stdio |
 | Tools | 22 generated at startup from `openapi.json` (14 GET, 5 POST, 3 PUT; no DELETE exists). Names from the `NAMES` map (L91). Input schema = inlined OpenAPI params + `body` |
 | Auth | `api-key` header from `HEVY_API_KEY`, loaded from `hevy-mcp/.env` (L14) or process env |
 | Egress | Single host `api.hevyapp.com` (pinned, L26), https-only, `redirect:"error"`, 15 s timeout |
@@ -141,6 +141,6 @@ Already good: read-only by default, write allowlist, Ajv input validation, size/
 | F7 | Medium | Verified | Low-Med | Fixed | No contract snapshot; thin negative tests |
 | F5 | Medium | Verified | Low | Fixed | No git/CI/quality gates |
 | F6 | Medium | Verified | Med | Fixed (differs) | 429/Retry-After unhandled |
-| F3 | Medium | Risk | Med | Partly fixed | Audit chain forks with concurrent instances |
+| F3 | Medium | Risk | Med | Fixed | Audit chain forks with concurrent instances; rotation added |
 | F4 | Medium | Verified | Low | Accepted | `.env` readable by Authenticated Users |
 | F8-F15 | Low | Mixed | Low-Med | See status update | See above |

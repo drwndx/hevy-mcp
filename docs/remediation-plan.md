@@ -4,7 +4,7 @@ Rules for every step: keep the 22 tool names, descriptions, input schemas and an
 
 ## Status (reviewed after the adversarial review A1-A12 and tooling plan P1-P7)
 
-Verified against `hevy-mcp/index.mjs` and CI (green at `0c9a78b`, 72 offline tests, Node 20/22 plus gitleaks).
+Verified against `hevy-mcp/index.mjs` and CI (green at `e9eea44`, 80 offline tests, Node 20/22 plus gitleaks). R5 is now also pinned by tests (F9 ordering accepted, F10 no host leak).
 
 | Step | Status | Notes |
 | ---- | ------ | ----- |
@@ -14,18 +14,16 @@ Verified against `hevy-mcp/index.mjs` and CI (green at `0c9a78b`, 72 offline tes
 | R4 git, CI, secrets | **Done, one gap** | `ci.yml` (lint, format, typecheck, test, `npm audit`, gitleaks) and Dependabot run on GitHub. The planted-fake-key gitleaks check has **not** been done. |
 | R5 validation order, error text | **Largely done** | Covered by A2/A12 and the A-series fixes. The exact order was not re-audited line by line. |
 | R6 429 and bounded retry | **Done, deviates from plan** | 429 opens the circuit breaker and is not retried. GETs retry up to 2 times on 502/503/504 only, honouring `Retry-After` (cap 5 s) with jitter. Timeouts, 500s and network errors are not retried. This is more conservative than "retry on 429/network error". |
-| R7 audit robustness | **Partly done** | A directory lock on every append stops forks between concurrent instances. Size-based rotation is **not** implemented. |
-| R8 local hardening, config | **Partly done** | Streamed byte cap implemented. An API-key shape warning was added (P6). `.env` ACL work was explicitly excluded by the owner. Warnings for invalid or unknown env values are **not** implemented. `intEnv` still silently falls back to defaults. |
-| R9 structure, observability | **Partly done** | `// @ts-check`-style checking is in place via `tsc` checkJs (non-strict baseline). `requestId` is in audit and logs. Module split (P8) and per-endpoint breaker are deferred, and the single-file layout is intentional for now. |
+| R7 audit robustness | **Done** | A directory lock on every append stops forks. Size-based rotation (`HEVY_AUDIT_MAX_BYTES`, keeps `.1`-`.3`) writes a `chain_restart` record; all files verify (W4). |
+| R8 local hardening, config | **Done** | Streamed byte cap, API-key shape warning (P6), and warnings for invalid or unknown env values (W2; defaults still apply, but the problem is logged). `.env` ACL work was excluded by the owner. |
+| R9 structure, observability | **Partly done** | `tsc` checkJs (non-strict baseline), `requestId` in audit and logs, exit `summary` log and `--check` diagnostics (W5, W7). Module split (P8) and per-endpoint breaker are deferred, and the single-file layout is intentional for now. |
 
 Remaining work, in priority order:
 1. R4: run the planted-fake-key gitleaks negative check on a throwaway branch.
-2. R8: warn on invalid or unknown `HEVY_*` values (low effort).
-3. R7: audit log rotation, only if the log grows in practice.
-4. R9: module split and per-endpoint breaker, only if new features are planned.
-5. Tighten `tsconfig.json` towards `strict` incrementally.
+2. R9: module split and per-endpoint breaker, only if new features are planned.
+3. Tighten `tsconfig.json` towards `strict` incrementally.
 
-Accepted or out of scope: file-permission hardening, A7 (a malfunctioning client can exhaust the write budget; bounded by write limits), A8 (no nonce delimiter on the untrusted-content notice), and PUT tool annotations and unknown body fields, which are kept to preserve the tool contract.
+Accepted or out of scope: file-permission hardening, A7 (a malfunctioning client can exhaust the write budget; bounded by write limits), and PUT tool annotations and unknown body fields, which are kept to preserve the tool contract.
 
 The step descriptions below are the original plan and are kept for history.
 
