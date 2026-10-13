@@ -94,7 +94,7 @@ Verified locally on Node 22.20: `npm test` 70/70 pass, `npm run lint` clean, `np
 
 | Step | Status | Notes |
 |---|---|---|
-| P1 CI | Implemented, **not yet run on GitHub** | `.github/workflows/ci.yml` (Node 20/22: `npm ci`, lint, format:check, typecheck, test, `npm audit`; separate gitleaks job), `.github/dependabot.yml`. Actions pinned by SHA, `contents: read`, no `HEVY_API_KEY` in CI. Confirm the repo is on GitHub, and gitleaks-action may need a licence for organisation repos. The dummy-secret check from the plan has not been done. |
+| P1 CI | Implemented and **verified green on GitHub** (commit 0c9a78b, Node 20/22 plus gitleaks) | `.github/workflows/ci.yml` (Node 20/22: `npm ci`, lint, format:check, typecheck, test, `npm audit`; separate gitleaks job), `.github/dependabot.yml`. Actions pinned by SHA, `contents: read`, no `HEVY_API_KEY` in CI. Confirm the repo is on GitHub, and gitleaks-action may need a licence for organisation repos. The dummy-secret check from the plan has not been done. |
 | P2 Lint/format | Implemented | ESLint flat config, Prettier (printWidth 140, `endOfLine: auto`). Prettier was applied once across the tree (formatting only). Dev dependencies are exact-pinned. |
 | P3 checkJs | Implemented at baseline | `tsconfig.json` with `allowJs`/`checkJs` and `strict: false`. Tightening to `strict: true` per file is still to do. No `@ts-ignore` used. |
 | P4 Structured logging | Implemented | `log()` writes one redacted JSON line per event to stderr; each tool call has a `requestId` that is also in the audit entry (an added field; `verify-audit.mjs` still passes). Tests: stdout contains only JSON-RPC, stderr lines are JSON, key never appears in either. |
@@ -104,10 +104,10 @@ Deviations and findings:
 - `test` uses `node --test` rather than the glob in the plan, for Node 20 and 22 compatibility.
 - A latent bug was found and fixed while writing tests: a 2xx response with a JSON content-type but an invalid body was passed to `text(null)` instead of being reported as an error. It now returns the "not JSON, not trusted" error. A regression test was added.
 - Not done: P6â€“P8, GET-only retries, 2xx `error`-key handling.
-## 7. P6–P8 status
+## 7. P6ï¿½P8 status
 
 - **P6 Secrets hygiene: implemented.** Startup logs a `api_key_unexpected_shape` warning (never the value) if the key is not UUID-shaped; it warns rather than refuses, since the key format is not contractually guaranteed. The gitleaks pre-commit hook is documented in the README, not installed. File permissions remain excluded.
 - **P7 Reliability: GET retry implemented, with your go-ahead.** At most 2 retries on 502/503/504 only (not timeouts, 500s or network errors), `Retry-After` honoured, jittered backoff, GET only; POST/PUT are never retried (tested). Not implemented: treating a 2xx body with an `error` key as a failure, because Hevy signals errors with non-2xx and the rule would be speculative.
 - **P8 Module split: deliberately deferred.** The spec-skipping test copies `index.mjs` alone into a temp dir, so a split needs test changes too, and it adds no safety on its own. Revisit when the file grows or a second contributor needs it.
 
-Verified locally: 72/72 tests, lint, typecheck and Prettier clean. CI still not run on GitHub.
+Verified locally: 72/72 tests, lint, typecheck and Prettier clean. CI succeeded on GitHub at 0c9a78b (72 tests). The dummy-secret gitleaks negative check remains not done.
