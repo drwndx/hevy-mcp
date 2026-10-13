@@ -40,7 +40,7 @@ Each step is independently testable and reversible. Order is by risk reduction p
 - Add `.github/dependabot.yml` for npm and github-actions.
 - Add a gitleaks job (also covers priority 8).
 - Validation: open a PR with a dummy secret string and confirm the job fails; confirm the green path on the current tree.
-- Prerequisite: confirm the repo is a git repo on GitHub. `.git` exists at `D:\vscode_projects\hevy`, but the session reported no git repository, so check this first.
+- Prerequisite: confirm the repo is a git repo on GitHub. `.git` exists at the repo root, but the session reported no git repository, so check this first.
 
 ### P2. Lint and format (Low effort)
 - Dev dependencies: `eslint`, `@eslint/js`, `globals`, `prettier`. Use a flat `eslint.config.js` with `recommended` plus `no-console` (allow `error`), `eqeqeq` and `no-unused-vars`.

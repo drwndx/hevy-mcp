@@ -2,6 +2,33 @@
 
 Rules for every step: keep the 22 tool names, descriptions, input schemas and annotations unchanged (guarded by R2); no new dependencies or frameworks; each step ships with its own tests and `npm test` stays green. Finding IDs refer to [engineering-audit.md](./engineering-audit.md).
 
+## Status (reviewed after the adversarial review A1-A12 and tooling plan P1-P7)
+
+Verified against `hevy-mcp/index.mjs` and CI (green at `0c9a78b`, 72 offline tests, Node 20/22 plus gitleaks).
+
+| Step | Status | Notes |
+| ---- | ------ | ----- |
+| R1 path params | **Done** | Covered by A1; id/date patterns enforced before any request. |
+| R2 snapshot and negative tests | **Done** | `test/tools.snapshot.json`, plus per-tool tests for all 22 tools (P5). |
+| R3 ambiguous write outcome | **Done** | A write failure reports an unknown outcome and is never auto-retried. |
+| R4 git, CI, secrets | **Done, one gap** | `ci.yml` (lint, format, typecheck, test, `npm audit`, gitleaks) and Dependabot run on GitHub. The planted-fake-key gitleaks check has **not** been done. |
+| R5 validation order, error text | **Largely done** | Covered by A2/A12 and the A-series fixes. The exact order was not re-audited line by line. |
+| R6 429 and bounded retry | **Done, deviates from plan** | 429 opens the circuit breaker and is not retried. GETs retry up to 2 times on 502/503/504 only, honouring `Retry-After` (cap 5 s) with jitter. Timeouts, 500s and network errors are not retried. This is more conservative than "retry on 429/network error". |
+| R7 audit robustness | **Partly done** | A directory lock on every append stops forks between concurrent instances. Size-based rotation is **not** implemented. |
+| R8 local hardening, config | **Partly done** | Streamed byte cap implemented. An API-key shape warning was added (P6). `.env` ACL work was explicitly excluded by the owner. Warnings for invalid or unknown env values are **not** implemented. `intEnv` still silently falls back to defaults. |
+| R9 structure, observability | **Partly done** | `// @ts-check`-style checking is in place via `tsc` checkJs (non-strict baseline). `requestId` is in audit and logs. Module split (P8) and per-endpoint breaker are deferred, and the single-file layout is intentional for now. |
+
+Remaining work, in priority order:
+1. R4: run the planted-fake-key gitleaks negative check on a throwaway branch.
+2. R8: warn on invalid or unknown `HEVY_*` values (low effort).
+3. R7: audit log rotation, only if the log grows in practice.
+4. R9: module split and per-endpoint breaker, only if new features are planned.
+5. Tighten `tsconfig.json` towards `strict` incrementally.
+
+Accepted or out of scope: file-permission hardening, A7 (a malfunctioning client can exhaust the write budget; bounded by write limits), A8 (no nonce delimiter on the untrusted-content notice), and PUT tool annotations and unknown body fields, which are kept to preserve the tool contract.
+
+The step descriptions below are the original plan and are kept for history.
+
 ## R2. Contract snapshot and negative/boundary tests (F7) — do first, effort Low-Med
 - **Change:** Add a golden `test/tools.snapshot.json` of the full `tools/list` result (writes enabled), taken from the current build, with a test that diffs it. Add boundary tests (`pageSize` at/over max, empty strings, null body, oversized body, wrong types). Document `openapi.json` provenance in README.
 - **Done when:** Any schema/description/annotation change fails the snapshot test.

@@ -1,10 +1,30 @@
 # Engineering Audit: hevy-mcp
 
-Scope: whole repository at `D:\vscode_projects\hevy`. Line numbers refer to [hevy-mcp/index.mjs](../hevy-mcp/index.mjs) unless stated. Audit was read-only; no application behavior was changed.
+Scope: whole repository (repo root). Line numbers refer to [hevy-mcp/index.mjs](../hevy-mcp/index.mjs) unless stated. Audit was read-only; no application behavior was changed.
 
 Labels: **[Verified]** reproduced or confirmed in code/tooling. **[Risk]** plausible, depends on conditions. **[Rec]** improvement, no defect.
 
-## 1. Discovery summary (verified)
+> **Status update (after the adversarial review A1-A12 and tooling plan P1-P7; CI green at `0c9a78b`, 72 offline tests).** This audit is a point-in-time record: the findings, line numbers and "Discovery summary" below describe the code **as audited** and are kept for history. Current status per finding is in the table below and in section 4. For remaining work see [remediation-plan.md](./remediation-plan.md).
+>
+> | Finding | Status now |
+> |---|---|
+> | F1 path traversal | **Fixed** (A1): ids and dates validated before the URL is built |
+> | F2 ambiguous write outcome | **Fixed**: failed writes report "outcome unknown", never auto-retried |
+> | F3 audit chain fork | **Partly fixed**: a directory lock serialises appends across instances. Rotation and `chain_restart` are not implemented |
+> | F4 `.env` permissions | **Accepted / out of scope** (owner decision) |
+> | F5 git, CI, gates | **Fixed**: git, CI (lint, format, typecheck, test, `npm audit`, gitleaks), Dependabot. The planted-secret negative check is not done |
+> | F6 429 / retry | **Fixed, differs from the recommendation**: 429 opens the breaker (not retried); GETs retry up to 2 times on 502/503/504 only, honouring `Retry-After` |
+> | F7 contract protection | **Fixed**: golden `test/tools.snapshot.json`, per-tool tests for all 22 tools |
+> | F8 response buffering | **Fixed**: streamed read with a byte ceiling |
+> | F9 validation order | **Not re-verified** |
+> | F10 error text detail | **Not re-verified** |
+> | F11 config handling | **Partly fixed**: API-key shape warning added. Invalid or unknown env values still fall back silently, and `intEnv` is unchanged |
+> | F12 structure, annotations | **Open, accepted**: single-file layout kept (P8 deferred); `tsc` checkJs added; PUT `destructiveHint:false` unchanged to preserve the contract |
+> | F13 observability | **Fixed**: `requestId` in audit and tool results, structured JSON logs on stderr. No metrics or exit summary |
+> | F14 prompt injection | **Open, accepted** (advisory control; A8 nonce delimiter not implemented) |
+> | F15 supply chain | **Fixed**: exact pins, Dependabot, `.npmrc`, `npm ci` documented |
+
+## 1. Discovery summary (verified at audit time; see status update above for changes)
 
 | Area | Finding |
 |---|---|
@@ -114,13 +134,13 @@ Already good: read-only by default, write allowlist, Ajv input validation, size/
 
 ## 4. Summary
 
-| # | Severity | Type | Effort | Title |
-|---|---|---|---|---|
-| F1 | High | Verified | Low | Path traversal via `.`/`..` ids |
-| F2 | Medium | Verified | Low | Ambiguous write outcome on timeout |
-| F7 | Medium | Verified | Low-Med | No contract snapshot; thin negative tests |
-| F5 | Medium | Verified | Low | No git/CI/quality gates |
-| F6 | Medium | Verified | Med | 429/Retry-After unhandled |
-| F3 | Medium | Risk | Med | Audit chain forks with concurrent instances |
-| F4 | Medium | Verified | Low | `.env` readable by Authenticated Users |
-| F8-F15 | Low | Mixed | Low-Med | See above |
+| # | Severity | Type | Effort | Status | Title |
+|---|---|---|---|---|---|
+| F1 | High | Verified | Low | Fixed | Path traversal via `.`/`..` ids |
+| F2 | Medium | Verified | Low | Fixed | Ambiguous write outcome on timeout |
+| F7 | Medium | Verified | Low-Med | Fixed | No contract snapshot; thin negative tests |
+| F5 | Medium | Verified | Low | Fixed | No git/CI/quality gates |
+| F6 | Medium | Verified | Med | Fixed (differs) | 429/Retry-After unhandled |
+| F3 | Medium | Risk | Med | Partly fixed | Audit chain forks with concurrent instances |
+| F4 | Medium | Verified | Low | Accepted | `.env` readable by Authenticated Users |
+| F8-F15 | Low | Mixed | Low-Med | See status update | See above |
