@@ -858,12 +858,12 @@ test("--check reports readiness and exits non-zero when the key is missing", () 
   const run = (key) =>
     spawnSync(process.execPath, [serverPath, "--check"], {
       encoding: "utf8",
-      env: { ...process.env, HEVY_API_KEY: key, HEVY_BASE_URL: baseUrl, HEVY_AUDIT_LOG: "off" },
+      env: { ...process.env, HEVY_API_KEY: key, HEVY_BASE_URL: baseUrl, HEVY_AUDIT_LOG: "off", HEVY_ENABLE_WRITES: "0" },
     });
   const ok = run(API_KEY);
   assert.equal(ok.status, 0, ok.stderr);
   const report = JSON.parse(ok.stdout);
-  assert.equal(report.tools, 22);
+  assert.equal(report.tools, 14);
   assert.equal(report.apiKeyPresent, true);
   assert.ok(!ok.stdout.includes(API_KEY));
   assert.equal(run("").status, 1);
