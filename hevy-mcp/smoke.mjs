@@ -17,7 +17,10 @@ await client.connect(transport);
 
 const { tools } = await client.listTools();
 let failed = 0;
-const check = (ok, msg) => { console.log(`${ok ? "PASS" : "FAIL"}  ${msg}`); if (!ok) failed++; };
+const check = (ok, msg) => {
+  console.log(`${ok ? "PASS" : "FAIL"}  ${msg}`);
+  if (!ok) failed++;
+};
 
 check(tools.length === 14 && tools.every((t) => t.annotations?.readOnlyHint), `exposes only the 14 read-only tools (got ${tools.length})`);
 

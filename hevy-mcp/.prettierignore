@@ -1,0 +1,6 @@
+node_modules
+package-lock.json
+openapi.json
+test/tools.snapshot.json
+audit.log
+tmp-spec-*

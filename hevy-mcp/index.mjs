@@ -1,23 +1,31 @@
 #!/usr/bin/env node
 // MCP server exposing the entire Hevy public API. Tools are generated from openapi.json.
 import { readFileSync, appendFileSync, mkdirSync, rmSync, statSync, openSync, readSync, fstatSync, closeSync } from "node:fs";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import Ajv from "ajv";
-import addFormats from "ajv-formats";
+import Ajv2020 from "ajv";
+import addFormatsModule from "ajv-formats";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-try { process.loadEnvFile(join(here, ".env")); } catch { /* .env is optional */ }
+try {
+  process.loadEnvFile(join(here, ".env"));
+} catch {
+  /* .env is optional */
+}
 const spec = JSON.parse(readFileSync(join(here, "openapi.json"), "utf8"));
 
 // The api-key header is sent to BASE_URL, so refuse anything that isn't HTTPS (loopback HTTP is allowed for tests).
 function resolveBaseUrl(raw) {
   let url;
-  try { url = new URL(raw); } catch { throw new Error(`HEVY_BASE_URL is not a valid URL: ${raw}`); }
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error(`HEVY_BASE_URL is not a valid URL: ${raw}`);
+  }
   const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
   if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) {
     throw new Error("HEVY_BASE_URL must use https:// (http:// is only allowed for localhost).");
@@ -40,10 +48,17 @@ try {
 const TIMEOUT_MS = Number(process.env.HEVY_TIMEOUT_MS) > 0 ? Number(process.env.HEVY_TIMEOUT_MS) : 15_000;
 const MAX_RESPONSE_CHARS = 100_000;
 
+// These CommonJS packages expose their export under `.default` in NodeNext typings.
+const Ajv = /** @type {typeof Ajv2020.default} */ (/** @type {unknown} */ (Ajv2020));
+const addFormats = /** @type {typeof addFormatsModule.default} */ (/** @type {unknown} */ (addFormatsModule));
 const ajv = new Ajv({ strict: false, allErrors: false, logger: false });
 addFormats(ajv);
 
-const resolveRef = (ref) => ref.replace("#/", "").split("/").reduce((o, k) => o[k], spec);
+const resolveRef = (ref) =>
+  ref
+    .replace("#/", "")
+    .split("/")
+    .reduce((o, k) => o[k], spec);
 
 // Inline $refs and convert OpenAPI 3.0 `nullable` into plain JSON Schema.
 function toJsonSchema(node) {
@@ -58,9 +73,7 @@ function toJsonSchema(node) {
     if (k === "nullable" || k === "example" || k === "required") continue;
 
     if (k === "type" && v === "enum") {
-      const types = [...new Set(
-        (node.enum ?? []).map(value => value === null ? "null" : typeof value)
-      )];
+      const types = [...new Set((node.enum ?? []).map((value) => (value === null ? "null" : typeof value)))];
       if (types.length === 1) out.type = types[0];
       else if (types.length > 1) out.type = types;
       continue;
@@ -168,12 +181,22 @@ for (const [path, methods] of Object.entries(spec.paths)) {
   }
 }
 
-const intEnv = (name, def) => (Number.isInteger(Number(process.env[name])) && Number(process.env[name]) >= 0 && process.env[name] !== undefined && process.env[name] !== "" ? Number(process.env[name]) : def);
+const intEnv = (name, def) =>
+  Number.isInteger(Number(process.env[name])) &&
+  Number(process.env[name]) >= 0 &&
+  process.env[name] !== undefined &&
+  process.env[name] !== ""
+    ? Number(process.env[name])
+    : def;
 
 // Least privilege: write tools are hidden unless explicitly enabled; HEVY_ALLOWED_TOOLS narrows further.
 const WRITES_ENABLED = ["1", "true"].includes(String(process.env.HEVY_ENABLE_WRITES).toLowerCase());
 const ALLOWED = process.env.HEVY_ALLOWED_TOOLS
-  ? new Set(process.env.HEVY_ALLOWED_TOOLS.split(",").map((s) => s.trim()).filter(Boolean))
+  ? new Set(
+      process.env.HEVY_ALLOWED_TOOLS.split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    )
   : null;
 const isExposed = (name, tool) =>
   (tool.method === "GET" || WRITES_ENABLED) && (!ALLOWED || ALLOWED.has(name) || ALLOWED.has(name.replace(/^hevy_/, "")));
@@ -223,12 +246,19 @@ function checkSemantics(tool, args) {
   return null;
 }
 function checkBody(v, key = "") {
-  if (typeof v === "number" && (!Number.isFinite(v) || v < 0 || v > MAX_NUMBER)) return `${key || "number"} must be between 0 and ${MAX_NUMBER}`;
+  if (typeof v === "number" && (!Number.isFinite(v) || v < 0 || v > MAX_NUMBER))
+    return `${key || "number"} must be between 0 and ${MAX_NUMBER}`;
   if (key === "title" && typeof v === "string" && !v.trim()) return "title must not be empty";
   if (Array.isArray(v)) {
-    for (const x of v) { const r = checkBody(x, key); if (r) return r; }
+    for (const x of v) {
+      const r = checkBody(x, key);
+      if (r) return r;
+    }
   } else if (v && typeof v === "object") {
-    for (const [k, x] of Object.entries(v)) { const r = checkBody(x, k); if (r) return r; }
+    for (const [k, x] of Object.entries(v)) {
+      const r = checkBody(x, k);
+      if (r) return r;
+    }
   }
   return null;
 }
@@ -239,9 +269,15 @@ function checkLimits(v, depth = 0) {
   if (typeof v === "string" && v.length > MAX_STRING_CHARS) return `string longer than ${MAX_STRING_CHARS} characters`;
   if (Array.isArray(v)) {
     if (v.length > MAX_ARRAY_ITEMS) return `array longer than ${MAX_ARRAY_ITEMS} items`;
-    for (const x of v) { const r = checkLimits(x, depth + 1); if (r) return r; }
+    for (const x of v) {
+      const r = checkLimits(x, depth + 1);
+      if (r) return r;
+    }
   } else if (v && typeof v === "object") {
-    for (const x of Object.values(v)) { const r = checkLimits(x, depth + 1); if (r) return r; }
+    for (const x of Object.values(v)) {
+      const r = checkLimits(x, depth + 1);
+      if (r) return r;
+    }
   }
   return null;
 }
@@ -251,7 +287,8 @@ let sessionWrites = 0;
 function writeAllowed() {
   const now = Date.now();
   while (writeTimes.length && now - writeTimes[0] > 60_000) writeTimes.shift();
-  if (sessionWrites >= MAX_WRITES_PER_SESSION) return `Write limit reached for this session (${MAX_WRITES_PER_SESSION}). Restart the server to continue.`;
+  if (sessionWrites >= MAX_WRITES_PER_SESSION)
+    return `Write limit reached for this session (${MAX_WRITES_PER_SESSION}). Restart the server to continue.`;
   if (writeTimes.length >= MAX_WRITES_PER_MINUTE) return `Write rate limit reached (${MAX_WRITES_PER_MINUTE}/minute). Try again shortly.`;
   writeTimes.push(now);
   sessionWrites++;
@@ -262,7 +299,8 @@ const readTimes = [];
 function readAllowed() {
   const now = Date.now();
   while (readTimes.length && now - readTimes[0] > 60_000) readTimes.shift();
-  if (MAX_READS_PER_MINUTE && readTimes.length >= MAX_READS_PER_MINUTE) return `Read rate limit reached (${MAX_READS_PER_MINUTE}/minute). Try again shortly.`;
+  if (MAX_READS_PER_MINUTE && readTimes.length >= MAX_READS_PER_MINUTE)
+    return `Read rate limit reached (${MAX_READS_PER_MINUTE}/minute). Try again shortly.`;
   readTimes.push(now);
   return null;
 }
@@ -273,7 +311,9 @@ const waiters = [];
 async function withSlot(fn) {
   if (inFlight >= MAX_CONCURRENCY) await new Promise((r) => waiters.push(r));
   inFlight++;
-  try { return await fn(); } finally {
+  try {
+    return await fn();
+  } finally {
     inFlight--;
     waiters.shift()?.();
   }
@@ -293,7 +333,10 @@ function claimPost(fp) {
 let consecutiveFailures = 0;
 let breakerOpenUntil = 0;
 function recordHealth(failed) {
-  if (!failed) { consecutiveFailures = 0; return; }
+  if (!failed) {
+    consecutiveFailures = 0;
+    return;
+  }
   if (++consecutiveFailures >= BREAKER_THRESHOLD) {
     breakerOpenUntil = Date.now() + BREAKER_COOLDOWN_MS;
     consecutiveFailures = 0;
@@ -312,7 +355,14 @@ function redact(t) {
   const variants = new Set([key]);
   if (key.length >= 6) {
     const b64 = Buffer.from(key).toString("base64");
-    for (const v of [encodeURIComponent(key), b64, b64.replace(/=+$/, ""), Buffer.from(key).toString("base64url"), Buffer.from(key).toString("hex")]) variants.add(v);
+    for (const v of [
+      encodeURIComponent(key),
+      b64,
+      b64.replace(/=+$/, ""),
+      Buffer.from(key).toString("base64url"),
+      Buffer.from(key).toString("hex"),
+    ])
+      variants.add(v);
   }
   let out = t;
   for (const v of variants) out = out.split(v).join("[REDACTED]");
@@ -346,14 +396,29 @@ const LOCK_PATH = AUDIT_PATH && AUDIT_PATH + ".lock";
 function withAuditLock(fn) {
   const deadline = Date.now() + 2000;
   for (;;) {
-    try { mkdirSync(LOCK_PATH); break; } catch (e) {
+    try {
+      mkdirSync(LOCK_PATH);
+      break;
+    } catch (e) {
       if (e.code !== "EEXIST") throw e;
-      try { if (Date.now() - statSync(LOCK_PATH).mtimeMs > 5000) rmSync(LOCK_PATH, { recursive: true }); } catch { /* raced */ }
-      if (Date.now() > deadline) throw new Error("audit lock timeout");
+      try {
+        if (Date.now() - statSync(LOCK_PATH).mtimeMs > 5000) rmSync(LOCK_PATH, { recursive: true });
+      } catch {
+        /* raced */
+      }
+      if (Date.now() > deadline) throw new Error("audit lock timeout", { cause: e });
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
     }
   }
-  try { return fn(); } finally { try { rmSync(LOCK_PATH, { recursive: true }); } catch { /* already gone */ } }
+  try {
+    return fn();
+  } finally {
+    try {
+      rmSync(LOCK_PATH, { recursive: true });
+    } catch {
+      /* already gone */
+    }
+  }
 }
 function readTailHash() {
   try {
@@ -365,8 +430,20 @@ function readTailHash() {
       readSync(fd, buf, 0, len, size - len);
       const lines = buf.toString("utf8").trim().split("\n");
       return JSON.parse(lines[lines.length - 1]).hash ?? "0".repeat(64);
-    } finally { closeSync(fd); }
-  } catch { return "0".repeat(64); }
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    return "0".repeat(64);
+  }
+}
+// One redacted JSON line per event on stderr; stdout is reserved for the MCP protocol.
+function log(level, event, fields = {}) {
+  try {
+    console.error(redact(JSON.stringify({ ts: new Date().toISOString(), level, event, ...fields })));
+  } catch {
+    /* logging must never break a tool call */
+  }
 }
 function audit(entry) {
   if (!AUDIT_PATH) return;
@@ -377,7 +454,7 @@ function audit(entry) {
       appendFileSync(AUDIT_PATH, JSON.stringify(record) + "\n", { mode: 0o600 });
     });
   } catch (e) {
-    console.error(`hevy-mcp: audit log write failed: ${e.message}`);
+    log("error", "audit_write_failed", { message: e.message });
   }
 }
 
@@ -416,13 +493,20 @@ async function callTool(name, args = {}, meta = {}) {
   }
   let postFingerprint = null;
   if (tool.method === "POST") {
-    postFingerprint = createHash("sha256").update(`${tool.path}\n${JSON.stringify(args.body)}`).digest("hex");
+    postFingerprint = createHash("sha256")
+      .update(`${tool.path}\n${JSON.stringify(args.body)}`)
+      .digest("hex");
     if (!claimPost(postFingerprint)) {
       meta.outcome = "duplicate_suppressed";
-      return text(`An identical ${name} request was already sent in the last ${Math.round(DEDUP_WINDOW_MS / 1000)}s, so it was not repeated to avoid creating a duplicate. Check the existing data with a read tool first.`, true);
+      return text(
+        `An identical ${name} request was already sent in the last ${Math.round(DEDUP_WINDOW_MS / 1000)}s, so it was not repeated to avoid creating a duplicate. Check the existing data with a read tool first.`,
+        true,
+      );
     }
   }
-  const release = () => { if (postFingerprint) recentPosts.delete(postFingerprint); };
+  const release = () => {
+    if (postFingerprint) recentPosts.delete(postFingerprint);
+  };
   if (meta.write) {
     const denied = writeAllowed();
     if (denied) {
@@ -438,7 +522,7 @@ async function callTool(name, args = {}, meta = {}) {
     }
   }
   meta.params = Object.fromEntries(
-    tool.params.filter((p) => args[p.name] != null).map((p) => [p.name, args[p.name]]),
+    tool.params.filter((p) => args[p.name] !== undefined && args[p.name] !== null).map((p) => [p.name, args[p.name]]),
   );
   if (tool.hasBody) {
     const raw = JSON.stringify(args.body);
@@ -477,7 +561,9 @@ async function callTool(name, args = {}, meta = {}) {
   } catch (e) {
     // A failed non-GET may still have been applied upstream; say so, and keep the duplicate guard in place.
     if (tool.method !== "GET") {
-      throw new Error(`${e.message}. The outcome is unknown: the change may have been applied. Check with a read tool before retrying.`, { cause: e });
+      throw new Error(`${e.message}. The outcome is unknown: the change may have been applied. Check with a read tool before retrying.`, {
+        cause: e,
+      });
     }
     throw e;
   }
@@ -488,7 +574,11 @@ async function callTool(name, args = {}, meta = {}) {
   }
   if (!res.ok) {
     let pretty = body;
-    try { pretty = JSON.stringify(JSON.parse(body), null, 2); } catch { /* not JSON */ }
+    try {
+      pretty = JSON.stringify(JSON.parse(body), null, 2);
+    } catch {
+      /* not JSON */
+    }
     return text(`HTTP ${res.status} ${res.statusText}\n${pretty}`, true, true);
   }
   // A 2xx that isn't the JSON the API promises (captive portal, proxy page, empty body) must not look like success.
@@ -502,14 +592,24 @@ async function callTool(name, args = {}, meta = {}) {
   }
   if (truncatedUpstream) {
     meta.outcome = "unexpected_response";
-    return text(`HTTP ${res.status} but the response exceeded ${MAX_RESPONSE_BYTES} bytes and was cut off, so it was not trusted. Use a smaller pageSize.\n${body.slice(0, 500)}`, true, true);
+    return text(
+      `HTTP ${res.status} but the response exceeded ${MAX_RESPONSE_BYTES} bytes and was cut off, so it was not trusted. Use a smaller pageSize.\n${body.slice(0, 500)}`,
+      true,
+      true,
+    );
   }
-  let pretty;
-  if (pretty === null || !isJson) {
+  let pretty = null;
+  if (isJson) {
+    try {
+      pretty = JSON.stringify(JSON.parse(body), null, 2);
+    } catch {
+      /* handled below */
+    }
+  }
+  if (pretty === null) {
     meta.outcome = "unexpected_response";
     return text(`HTTP ${res.status} but the response was not JSON, so it was not trusted:\n${body.slice(0, 500)}`, true, true);
   }
-  try { pretty = JSON.stringify(JSON.parse(body), null, 2); } catch { pretty = null; }
   return text(pretty, false, true);
 }
 
@@ -525,21 +625,23 @@ async function readCapped(res) {
     if (done) break;
     size += value.length;
     chunks.push(value);
-    if (size > MAX_RESPONSE_BYTES) { truncatedUpstream = true; await reader.cancel(); break; }
+    if (size > MAX_RESPONSE_BYTES) {
+      truncatedUpstream = true;
+      await reader.cancel();
+      break;
+    }
   }
   return { body: Buffer.concat(chunks).toString("utf8"), truncatedUpstream };
 }
 
-const server = new Server(
-  { name: "hevy-mcp", version: "1.0.0" },
-  { capabilities: { tools: {} } },
-);
+const server = new Server({ name: "hevy-mcp", version: "1.0.0" }, { capabilities: { tools: {} } });
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [...tools.values()].map((t) => t.def),
 }));
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
   const meta = {};
   const started = Date.now();
+  const requestId = randomUUID();
   let result;
   try {
     result = await callTool(req.params.name, req.params.arguments, meta);
@@ -552,17 +654,18 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   if (meta.status !== undefined || meta.outcome === "request_failed") {
     recordHealth(meta.outcome === "request_failed" || meta.status >= 500);
   }
-  audit({ tool: String(req.params.name).slice(0, MAX_NAME_LOG_CHARS), ...meta, durationMs: Date.now() - started });
+  const toolName = String(req.params.name).slice(0, MAX_NAME_LOG_CHARS);
+  const durationMs = Date.now() - started;
+  audit({ requestId, tool: toolName, ...meta, durationMs });
+  log("info", "tool_call", { requestId, tool: toolName, outcome: meta.outcome, status: meta.status, durationMs });
   return result;
 });
 
 // stdout carries the MCP protocol, so failures must go to stderr and exit non-zero.
 process.on("unhandledRejection", (e) => {
-  console.error("hevy-mcp: unhandled rejection:", e?.message ?? e);
+  log("error", "unhandled_rejection", { message: e instanceof Error ? e.message : String(e) });
   process.exit(1);
 });
 
 await server.connect(new StdioServerTransport());
-console.error(
-  `hevy-mcp: ready, ${tools.size} tools loaded (writes ${WRITES_ENABLED ? "ENABLED" : "disabled"}), API key ${process.env.HEVY_API_KEY ? "set" : "MISSING"}`,
-);
+log("info", "ready", { tools: tools.size, writes: WRITES_ENABLED, apiKeyPresent: Boolean(process.env.HEVY_API_KEY) });
