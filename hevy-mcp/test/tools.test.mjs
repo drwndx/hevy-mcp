@@ -796,3 +796,128 @@ test("writes are never retried on 503", async () => {
     await c.close();
   }
 });
+
+// Spawns the server directly and collects stderr (structured logs) for a short window.
+async function runServer(env, { args = [], closeStdin = false, ms = 800 } = {}) {
+  const { spawn } = await import("node:child_process");
+  const child = spawn(process.execPath, [serverPath, ...args], {
+    env: { ...process.env, HEVY_API_KEY: API_KEY, HEVY_BASE_URL: baseUrl, HEVY_AUDIT_LOG: "off", ...env },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  let err = "";
+  child.stderr.on("data", (d) => (err += d));
+  const exited = new Promise((r) => child.on("exit", r));
+  await new Promise((r) => setTimeout(r, ms));
+  if (closeStdin) {
+    child.stdin.end();
+    await Promise.race([exited, new Promise((r) => setTimeout(r, 3000))]);
+  }
+  child.kill();
+  return err
+    .split("\n")
+    .filter(Boolean)
+    .map((l) => JSON.parse(l));
+}
+
+test("each untrusted result carries a fresh nonce notice and leaves the data block unchanged", async () => {
+  nextResponse = { status: 200, body: { ok: true } };
+  const a = await client.callTool({ name: "hevy_get_user_info", arguments: {} });
+  const b = await client.callTool({ name: "hevy_get_user_info", arguments: {} });
+  const ca = /** @type {any} */ (a.content);
+  const cb = /** @type {any} */ (b.content);
+  assert.deepEqual(JSON.parse(ca[0].text), { ok: true });
+  const idA = /\[id ([0-9a-f]{16})\]/.exec(ca[1].text)?.[1];
+  const idB = /\[id ([0-9a-f]{16})\]/.exec(cb[1].text)?.[1];
+  assert.ok(idA && idB && idA !== idB);
+  assert.ok(ca[1].text.includes(`carrying the id ${idA}`));
+});
+
+test("invalid and unknown env values are warned about by name, never silently ignored", async () => {
+  const events = await runServer({
+    HEVY_MAX_CONCURRENCY: "lots",
+    HEVY_TIMEOUT_MS: "0",
+    HEVY_ENABLE_WRITES: "maybe",
+    HEVY_TYPO_SETTING: "x",
+    HEVY_ALLOWED_TOOLS: "get_workouts,not_a_tool",
+  });
+  const names = events.filter((e) => e.level === "warn").map((e) => `${e.event}:${e.name}`);
+  assert.ok(names.includes("invalid_env_value:HEVY_MAX_CONCURRENCY"));
+  assert.ok(names.includes("invalid_env_value:HEVY_TIMEOUT_MS"));
+  assert.ok(names.includes("invalid_env_value:HEVY_ENABLE_WRITES"));
+  assert.ok(names.includes("unknown_env_var:HEVY_TYPO_SETTING"));
+  assert.ok(names.includes("unknown_allowed_tool:not_a_tool"));
+  assert.ok(!names.some((n) => n.endsWith(":get_workouts")));
+});
+
+test("a missing API key is reported at startup", async () => {
+  const events = await runServer({ HEVY_API_KEY: "" });
+  assert.ok(events.some((e) => e.event === "api_key_missing" && e.level === "error"));
+});
+
+test("--check reports readiness and exits non-zero when the key is missing", () => {
+  const run = (key) =>
+    spawnSync(process.execPath, [serverPath, "--check"], {
+      encoding: "utf8",
+      env: { ...process.env, HEVY_API_KEY: key, HEVY_BASE_URL: baseUrl, HEVY_AUDIT_LOG: "off" },
+    });
+  const ok = run(API_KEY);
+  assert.equal(ok.status, 0, ok.stderr);
+  const report = JSON.parse(ok.stdout);
+  assert.equal(report.tools, 22);
+  assert.equal(report.apiKeyPresent, true);
+  assert.ok(!ok.stdout.includes(API_KEY));
+  assert.equal(run("").status, 1);
+});
+
+test("a summary with call counters is logged on exit", async () => {
+  const events = await runServer({}, { closeStdin: true });
+  const summary = events.find((e) => e.event === "summary");
+  assert.ok(summary, "summary event");
+  assert.equal(summary.calls, 0);
+  assert.equal(typeof summary.breakerTrips, "number");
+  assert.equal(typeof summary.uptimeMs, "number");
+});
+
+test("the audit log rotates with a chain_restart record and every file still verifies", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "hevy-rotate-"));
+  const log = join(dir, "audit.log");
+  const c = await connect({ HEVY_AUDIT_LOG: log, HEVY_AUDIT_MAX_BYTES: "1500" });
+  try {
+    nextResponse = { status: 200, body: { ok: true } };
+    for (let i = 0; i < 12; i++) await c.callTool({ name: "hevy_get_user_info", arguments: {} });
+  } finally {
+    await c.close();
+  }
+  const verify = (p) =>
+    spawnSync(process.execPath, [fileURLToPath(new URL("../verify-audit.mjs", import.meta.url)), p], { encoding: "utf8" });
+  const first = JSON.parse(readFileSync(log, "utf8").split("\n")[0]);
+  assert.equal(first.event, "chain_restart");
+  assert.equal(verify(log).status, 0);
+  assert.equal(verify(`${log}.1`).status, 0);
+  const lastOfRotated = JSON.parse(readFileSync(`${log}.1`, "utf8").trim().split("\n").pop());
+  assert.equal(first.prev, lastOfRotated.hash);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("F10: network failures and upstream errors do not leak the upstream URL or host", async () => {
+  const c = await connect({ HEVY_BASE_URL: "http://127.0.0.1:1" });
+  try {
+    const res = await c.callTool({ name: "hevy_get_user_info", arguments: {} });
+    assert.equal(res.isError, true);
+    assert.doesNotMatch(/** @type {any} */ (res.content)[0].text, /127\.0\.0\.1|localhost|:1\b/);
+  } finally {
+    await c.close();
+  }
+});
+
+test("F9 (pinned behaviour): while the breaker is open, invalid calls are reported as circuit_open", async () => {
+  const c = await connect({ HEVY_BREAKER_COOLDOWN_MS: "60000" });
+  try {
+    nextResponse = { status: 500, body: {} };
+    for (let i = 0; i < 5; i++) await c.callTool({ name: "hevy_get_user_info", arguments: {} });
+    const res = await c.callTool({ name: "hevy_get_workout", arguments: { workoutId: "../x" } });
+    assert.match(/** @type {any} */ (res.content)[0].text, /paused/);
+  } finally {
+    await c.close();
+  }
+});

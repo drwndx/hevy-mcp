@@ -51,6 +51,7 @@ All settings are environment variables (set in `hevy-mcp/.env`).
 | `HEVY_BREAKER_COOLDOWN_MS`                                        | 30000                      | Circuit-breaker cooldown                                             |
 | `HEVY_RETRY_BASE_MS`                                              | see README in `hevy-mcp/`  | Backoff base for GET retries                                         |
 | `HEVY_AUDIT_LOG`                                                  | `audit.log` next to server | Audit log path, or `off`                                             |
+| `HEVY_AUDIT_MAX_BYTES`                                            | `5000000`                  | Rotate the audit log above this size (`0` = never)                   |
 | `HEVY_BASE_URL` / `HEVY_ALLOW_CUSTOM_BASE_URL`                    | `https://api.hevyapp.com`  | Must be https on `api.hevyapp.com` unless explicitly overridden      |
 
 See [`hevy-mcp/README.md`](hevy-mcp/README.md) for full details on each setting.

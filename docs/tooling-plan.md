@@ -103,7 +103,7 @@ Verified locally on Node 22.20: `npm test` 70/70 pass, `npm run lint` clean, `np
 Deviations and findings:
 - `test` uses `node --test` rather than the glob in the plan, for Node 20 and 22 compatibility.
 - A latent bug was found and fixed while writing tests: a 2xx response with a JSON content-type but an invalid body was passed to `text(null)` instead of being reported as an error. It now returns the "not JSON, not trusted" error. A regression test was added.
-- Not done: P6–P8, GET-only retries, 2xx `error`-key handling.
+- Done later (see open-items-plan.md): P6, P7, GET-only retries, 2xx `error`-key handling, W1–W2, W4–W8. Not done: P8 (module split), gitleaks negative check.
 ## 7. P6�P8 status
 
 - **P6 Secrets hygiene: implemented.** Startup logs a `api_key_unexpected_shape` warning (never the value) if the key is not UUID-shaped; it warns rather than refuses, since the key format is not contractually guaranteed. The gitleaks pre-commit hook is documented in the README, not installed. File permissions remain excluded.
