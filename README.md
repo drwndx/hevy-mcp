@@ -5,13 +5,13 @@ A hardened [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) serv
 - 22 tools generated from Hevy's published OpenAPI spec (`hevy-mcp/openapi.json`): 14 read, 8 write.
 - **Read-only by default.** Write tools are only exposed when you opt in.
 - Plain JavaScript (ES modules), Node 20.12+. Single server file: [`hevy-mcp/index.mjs`](hevy-mcp/index.mjs).
-- Offline test suite (72 tests) that never touches a real Hevy account.
+- Offline test suite (84 tests) that never touches a real Hevy account.
 
 ## Repository layout
 
 | Path                          | Purpose                                                                    |
 | ----------------------------- | -------------------------------------------------------------------------- |
-| `hevy-mcp/index.mjs`          | The MCP server (stdio transport)                                           |
+| `hevy-mcp/index.mjs`          | The MCP server (stdio by default, optional HTTP)                           |
 | `hevy-mcp/openapi.json`       | Hevy API spec the tools are generated from                                 |
 | `hevy-mcp/test/`              | Offline tests, local fake Hevy API, and the pinned tool-contract snapshot  |
 | `hevy-mcp/smoke.mjs`          | Live **read-only** smoke check                                             |
@@ -37,7 +37,7 @@ A hardened [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) serv
 
 ## Running in a container
 
-The server speaks MCP over stdio, so the container is run interactively (`-i`) with no ports and no TTY. The image runs as the non-root `node` user and keeps the audit log in the `/data` volume.
+By default the server speaks MCP over stdio, so the container is run interactively (`-i`) with no ports and no TTY (for network access, see "Running as a network service" below). The image runs as the non-root `node` user and keeps the audit log in the `/data` volume.
 
 ```powershell
 # Build (from the repo root)
@@ -70,6 +70,48 @@ docker run -i --rm -e HEVY_API_KEY -v hevy-audit:/data hevy-mcp
 
   Define a matching `inputs` entry (`promptString`, `password: true`) so the key is prompted for rather than stored. Keep the existing `node` entry if you prefer to run locally.
 
+## Running as a network service (HTTP)
+
+For Python scripts or other agents, run the server in HTTP mode (MCP Streamable HTTP, stateless). It is **opt-in**, listens on `HEVY_HTTP_PORT` (default 3000), and **requires** a bearer token of at least 16 characters; it refuses to start without one. The endpoint is `POST /mcp`, and `GET /healthz` is an unauthenticated liveness check.
+
+```powershell
+# Generate a token once and keep it somewhere safe (not in git)
+$env:HEVY_HTTP_TOKEN = [Convert]::ToHexString((1..32 | % { Get-Random -Max 256 }))
+
+docker run -d --name hevy-mcp --restart unless-stopped `
+  -p 3000:3000 `
+  -e HEVY_TRANSPORT=http -e HEVY_HTTP_HOST=0.0.0.0 `
+  -e HEVY_API_KEY -e HEVY_HTTP_TOKEN `
+  -v hevy-audit:/data hevy-mcp
+```
+
+On Linux, generate the token with `openssl rand -hex 32`. Use `--env-file` on the server rather than putting secrets in shell history.
+
+Python client (`pip install mcp`):
+
+```python
+import asyncio, os
+from mcp import ClientSession
+from mcp.client.streamable_http import streamablehttp_client
+
+async def main():
+    headers = {"Authorization": f"Bearer {os.environ['HEVY_HTTP_TOKEN']}"}
+    async with streamablehttp_client("http://192.168.1.99:3000/mcp", headers=headers) as (r, w, _):
+        async with ClientSession(r, w) as s:
+            await s.initialize()
+            print([t.name for t in (await s.list_tools()).tools])
+            print(await s.call_tool("hevy_get_user_info", {}))
+
+asyncio.run(main())
+```
+
+Security notes for HTTP mode:
+
+- It speaks **plain HTTP**. Use it on a trusted home/LAN network only. Do not expose it to the internet without a TLS reverse proxy (Caddy, nginx, Traefik) in front.
+- Anyone with the token can use every tool that is enabled, including your Hevy data. Keep writes off (the default) unless you need them, and use `HEVY_ALLOWED_TOOLS` to narrow the tool set.
+- Rate limits, the circuit breaker and the audit log apply across all HTTP clients combined.
+- Bind to `127.0.0.1` (the default outside the container) if only local processes need access. The `docker run -p 127.0.0.1:3000:3000` form does the same for a container.
+
 ## Configuration
 
 All settings are environment variables (set in `hevy-mcp/.env`).
@@ -87,6 +129,9 @@ All settings are environment variables (set in `hevy-mcp/.env`).
 | `HEVY_RETRY_BASE_MS`                                              | see README in `hevy-mcp/`  | Backoff base for GET retries                                         |
 | `HEVY_AUDIT_LOG`                                                  | `audit.log` next to server | Audit log path, or `off`                                             |
 | `HEVY_AUDIT_MAX_BYTES`                                            | `5000000`                  | Rotate the audit log above this size (`0` = never)                   |
+| `HEVY_TRANSPORT`                                                  | `stdio`                    | Set to `http` (or pass `--http`) to serve Streamable HTTP            |
+| `HEVY_HTTP_TOKEN`                                                 | required for HTTP          | Bearer token, 16+ characters. Never logged.                          |
+| `HEVY_HTTP_HOST` / `HEVY_HTTP_PORT`                               | `127.0.0.1` / `3000`       | HTTP bind address and port                                           |
 | `HEVY_BASE_URL` / `HEVY_ALLOW_CUSTOM_BASE_URL`                    | `https://api.hevyapp.com`  | Must be https on `api.hevyapp.com` unless explicitly overridden      |
 
 See [`hevy-mcp/README.md`](hevy-mcp/README.md) for full details on each setting.

@@ -923,3 +923,86 @@ test("F9 (pinned behaviour): while the breaker is open, invalid calls are report
     await c.close();
   }
 });
+
+// ---- HTTP transport ----
+async function freePort() {
+  const { createServer } = await import("node:net");
+  return new Promise((resolve) => {
+    const s = createServer().listen(0, "127.0.0.1", () => {
+      const { port } = /** @type {import("node:net").AddressInfo} */ (s.address());
+      s.close(() => resolve(port));
+    });
+  });
+}
+
+async function startHttpServer(env = {}) {
+  const { spawn } = await import("node:child_process");
+  const port = await freePort();
+  const token = "t".repeat(24);
+  const child = spawn(process.execPath, [serverPath], {
+    env: {
+      ...process.env,
+      HEVY_API_KEY: API_KEY,
+      HEVY_BASE_URL: baseUrl,
+      HEVY_AUDIT_LOG: "off",
+      HEVY_TRANSPORT: "http",
+      HEVY_HTTP_PORT: String(port),
+      HEVY_HTTP_TOKEN: token,
+      ...env,
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let err = "";
+  child.stderr.on("data", (d) => (err += d));
+  for (let i = 0; i < 50 && !err.includes("http_listening"); i++) await new Promise((r) => setTimeout(r, 100));
+  return { child, port, token, url: `http://127.0.0.1:${port}`, logs: () => err };
+}
+
+test("HTTP mode: MCP client with the token lists tools and calls one", async () => {
+  nextResponse = { status: 200, body: { ok: true } };
+  const s = await startHttpServer({ HEVY_ENABLE_WRITES: "0" });
+  const { StreamableHTTPClientTransport } = await import("@modelcontextprotocol/sdk/client/streamableHttp.js");
+  const c = new Client({ name: "t", version: "1" });
+  await c.connect(
+    new StreamableHTTPClientTransport(new URL(`${s.url}/mcp`), { requestInit: { headers: { authorization: `Bearer ${s.token}` } } }),
+  );
+  assert.equal((await c.listTools()).tools.length, 14);
+  const r = await c.callTool({ name: "hevy_get_user_info", arguments: {} });
+  assert.ok(!r.isError);
+  await c.close();
+  s.child.kill();
+});
+
+test("HTTP mode: rejects missing/wrong token, wrong method, bad JSON, big bodies; /healthz is open", async () => {
+  const s = await startHttpServer();
+  const post = (headers, body = "{}") =>
+    fetch(`${s.url}/mcp`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body });
+  assert.equal((await post({})).status, 401);
+  assert.equal((await post({ authorization: "Bearer wrong" })).status, 401);
+  assert.equal((await post({ authorization: `Bearer ${s.token}` }, "{not json")).status, 400);
+  assert.equal((await post({ authorization: `Bearer ${s.token}` }, "x".repeat(1_100_000))).status, 413);
+  const get = await fetch(`${s.url}/mcp`, { headers: { authorization: `Bearer ${s.token}` } });
+  assert.equal(get.status, 405);
+  assert.equal((await fetch(`${s.url}/other`)).status, 404);
+  const h = await fetch(`${s.url}/healthz`);
+  assert.equal(h.status, 200);
+  assert.ok(!s.logs().includes(s.token), "token must never be logged");
+  s.child.kill();
+});
+
+test("HTTP mode refuses to start without a sufficiently long token", async () => {
+  const logs = await runServer({ HEVY_TRANSPORT: "http", HEVY_HTTP_TOKEN: "short" }, { ms: 1000 });
+  assert.ok(logs.some((l) => l.event === "http_token_missing_or_short"));
+  assert.ok(!logs.some((l) => l.event === "http_listening"));
+});
+
+test("--check reports transport and flags a missing HTTP token", () => {
+  const r = spawnSync(process.execPath, [serverPath, "--check"], {
+    env: { ...process.env, HEVY_API_KEY: API_KEY, HEVY_AUDIT_LOG: "off", HEVY_TRANSPORT: "http", HEVY_HTTP_TOKEN: "" },
+    encoding: "utf8",
+  });
+  const out = JSON.parse(r.stdout);
+  assert.equal(out.transport, "http");
+  assert.equal(r.status, 1);
+  assert.ok(out.problems.some((p) => p.event === "http_token_missing_or_short"));
+});

@@ -14,5 +14,7 @@ RUN mkdir /data && chown node:node /data
 VOLUME /data
 USER node
 
-# stdio MCP server: run with `docker run -i` (no TTY, no port).
+# stdio MCP server by default: run with `docker run -i`. Set HEVY_TRANSPORT=http
+# (plus HEVY_HTTP_HOST=0.0.0.0 and HEVY_HTTP_TOKEN) to serve on this port instead.
+EXPOSE 3000
 ENTRYPOINT ["node", "index.mjs"]

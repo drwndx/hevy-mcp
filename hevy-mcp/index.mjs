@@ -14,7 +14,7 @@ import {
   accessSync,
   constants as fsConstants,
 } from "node:fs";
-import { createHash, randomUUID, randomBytes } from "node:crypto";
+import { createHash, randomUUID, randomBytes, timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -30,6 +30,8 @@ import Ajv2020 from "ajv";
 import addFormatsModule from "ajv-formats";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { createServer } from "node:http";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -704,34 +706,38 @@ async function readCapped(res) {
   return { body: Buffer.concat(chunks).toString("utf8"), truncatedUpstream };
 }
 
-const server = new Server({ name: "hevy-mcp", version: "1.0.0" }, { capabilities: { tools: {} } });
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: [...tools.values()].map((t) => t.def),
-}));
-server.setRequestHandler(CallToolRequestSchema, async (req) => {
-  const meta = {};
-  const started = Date.now();
-  const requestId = randomUUID();
-  let result;
-  try {
-    result = await callTool(req.params.name, req.params.arguments, meta);
-  } catch (e) {
-    meta.outcome = "request_failed";
-    meta.error = redact(String(e.message));
-    result = text(`Request failed: ${e.message}`, true);
-  }
-  meta.outcome ??= result.isError ? (meta.status ? "http_error" : "error") : "ok";
-  stats.calls++;
-  stats.byOutcome[meta.outcome] = (stats.byOutcome[meta.outcome] ?? 0) + 1;
-  if (meta.status !== undefined || meta.outcome === "request_failed") {
-    recordHealth(meta.outcome === "request_failed" || meta.status >= 500);
-  }
-  const toolName = String(req.params.name).slice(0, MAX_NAME_LOG_CHARS);
-  const durationMs = Date.now() - started;
-  audit({ requestId, tool: toolName, ...meta, durationMs });
-  log("info", "tool_call", { requestId, tool: toolName, outcome: meta.outcome, status: meta.status, durationMs });
-  return result;
-});
+// Handlers are registered per Server instance; HTTP mode builds one per request (stateless).
+function buildServer() {
+  const server = new Server({ name: "hevy-mcp", version: "1.0.0" }, { capabilities: { tools: {} } });
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: [...tools.values()].map((t) => t.def),
+  }));
+  server.setRequestHandler(CallToolRequestSchema, async (req) => {
+    const meta = {};
+    const started = Date.now();
+    const requestId = randomUUID();
+    let result;
+    try {
+      result = await callTool(req.params.name, req.params.arguments, meta);
+    } catch (e) {
+      meta.outcome = "request_failed";
+      meta.error = redact(String(e.message));
+      result = text(`Request failed: ${e.message}`, true);
+    }
+    meta.outcome ??= result.isError ? (meta.status ? "http_error" : "error") : "ok";
+    stats.calls++;
+    stats.byOutcome[meta.outcome] = (stats.byOutcome[meta.outcome] ?? 0) + 1;
+    if (meta.status !== undefined || meta.outcome === "request_failed") {
+      recordHealth(meta.outcome === "request_failed" || meta.status >= 500);
+    }
+    const toolName = String(req.params.name).slice(0, MAX_NAME_LOG_CHARS);
+    const durationMs = Date.now() - started;
+    audit({ requestId, tool: toolName, ...meta, durationMs });
+    log("info", "tool_call", { requestId, tool: toolName, outcome: meta.outcome, status: meta.status, durationMs });
+    return result;
+  });
+  return server;
+}
 
 // stdout carries the MCP protocol, so failures must go to stderr and exit non-zero.
 process.on("unhandledRejection", (e) => {
@@ -750,6 +756,7 @@ const INT_ENV = {
   HEVY_AUDIT_MAX_BYTES: 0,
   HEVY_RETRY_BASE_MS: 0,
   HEVY_TIMEOUT_MS: 1,
+  HEVY_HTTP_PORT: 1,
 };
 const KNOWN_ENV = new Set([
   ...Object.keys(INT_ENV),
@@ -759,6 +766,9 @@ const KNOWN_ENV = new Set([
   "HEVY_ENABLE_WRITES",
   "HEVY_ALLOWED_TOOLS",
   "HEVY_AUDIT_LOG",
+  "HEVY_TRANSPORT",
+  "HEVY_HTTP_HOST",
+  "HEVY_HTTP_TOKEN",
 ]);
 function envProblems() {
   const problems = [];
@@ -784,6 +794,68 @@ function envProblems() {
   return problems;
 }
 
+const HTTP_MODE = process.env.HEVY_TRANSPORT === "http" || process.argv.includes("--http");
+const HTTP_TOKEN = process.env.HEVY_HTTP_TOKEN ?? "";
+const HTTP_TOKEN_MIN = 16;
+const MAX_HTTP_BODY_BYTES = 1_000_000;
+
+// Stateless Streamable HTTP: POST /mcp with a bearer token. A fresh Server per request, so no session state to leak.
+async function startHttp() {
+  const host = process.env.HEVY_HTTP_HOST || "127.0.0.1";
+  const port = Number(process.env.HEVY_HTTP_PORT) > 0 ? Number(process.env.HEVY_HTTP_PORT) : 3000;
+  const expected = createHash("sha256").update(HTTP_TOKEN).digest();
+  const httpServer = createServer(async (req, res) => {
+    const send = (code, body, headers = {}) => {
+      res.writeHead(code, { "content-type": "application/json", ...headers });
+      res.end(JSON.stringify(body));
+    };
+    try {
+      const path = (req.url || "").split("?")[0];
+      if (path === "/healthz" && req.method === "GET") return send(200, { status: "ok" });
+      if (path !== "/mcp") return send(404, { error: "not found" });
+      const m = /^Bearer (.+)$/.exec(req.headers.authorization ?? "");
+      const got = createHash("sha256")
+        .update(m ? m[1] : "")
+        .digest();
+      if (!m || !timingSafeEqual(got, expected)) {
+        log("warn", "http_auth_failed", {});
+        return send(401, { error: "unauthorized" }, { "www-authenticate": "Bearer" });
+      }
+      if (req.method !== "POST") return send(405, { error: "method not allowed" }, { allow: "POST" });
+      const chunks = [];
+      let size = 0;
+      for await (const c of req) {
+        size += c.length;
+        if (size > MAX_HTTP_BODY_BYTES) return send(413, { error: "request too large" });
+        chunks.push(c);
+      }
+      let body;
+      try {
+        body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      } catch {
+        return send(400, { error: "invalid JSON" });
+      }
+      const s = buildServer();
+      const t = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+      res.on("close", () => {
+        void t.close();
+        void s.close();
+      });
+      await s.connect(t);
+      await t.handleRequest(req, res, body);
+    } catch (e) {
+      log("error", "http_request_failed", { message: redact(e instanceof Error ? e.message : String(e)) });
+      if (!res.headersSent) send(500, { error: "internal error" });
+    }
+  });
+  await new Promise((resolve, reject) => {
+    httpServer.once("error", reject);
+    httpServer.listen(port, host, () => resolve(undefined));
+  });
+  log("info", "http_listening", { host, port });
+  for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => httpServer.close(() => process.exit(0)));
+}
+
 // `node index.mjs --check` prints a startup diagnosis and exits (no MCP traffic), so launch problems are visible.
 if (process.argv.includes("--check")) {
   let auditOk = true;
@@ -804,14 +876,18 @@ if (process.argv.includes("--check")) {
         writes: WRITES_ENABLED,
         baseUrlHost: new URL(BASE_URL).host,
         apiKeyPresent,
+        transport: HTTP_MODE ? "http" : "stdio",
         audit: AUDIT_PATH ? { writableDir: auditOk } : "off",
-        problems: envProblems(),
+        problems: [
+          ...envProblems(),
+          ...(HTTP_MODE && HTTP_TOKEN.length < HTTP_TOKEN_MIN ? [{ event: "http_token_missing_or_short" }] : []),
+        ],
       },
       null,
       2,
     ),
   );
-  process.exit(apiKeyPresent && auditOk ? 0 : 1);
+  process.exit(apiKeyPresent && auditOk && (!HTTP_MODE || HTTP_TOKEN.length >= HTTP_TOKEN_MIN) ? 0 : 1);
 }
 
 process.on("exit", () => {
@@ -819,7 +895,15 @@ process.on("exit", () => {
 });
 for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => process.exit(0));
 
-await server.connect(new StdioServerTransport());
+if (HTTP_MODE) {
+  if (HTTP_TOKEN.length < HTTP_TOKEN_MIN) {
+    log("error", "http_token_missing_or_short", { hint: `HTTP mode requires HEVY_HTTP_TOKEN of at least ${HTTP_TOKEN_MIN} characters` });
+    process.exit(1);
+  }
+  await startHttp();
+} else {
+  await buildServer().connect(new StdioServerTransport());
+}
 for (const p of envProblems()) log("warn", p.event, { name: p.name, hint: p.hint });
 if (!process.env.HEVY_API_KEY) {
   log("error", "api_key_missing", {
