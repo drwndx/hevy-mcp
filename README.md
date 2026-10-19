@@ -35,6 +35,41 @@ A hardened [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) serv
 4. Update the **absolute path** to `index.mjs` in `.mcp.json` to match your checkout.
 5. Open the folder in VS Code and start the `hevy` server from the MCP tools list, or run `node index.mjs` manually. On startup it logs a JSON `ready` line to stderr stating how many tools are loaded and whether writes are enabled.
 
+## Running in a container
+
+The server speaks MCP over stdio, so the container is run interactively (`-i`) with no ports and no TTY. The image runs as the non-root `node` user and keeps the audit log in the `/data` volume.
+
+```powershell
+# Build (from the repo root)
+docker build -t hevy-mcp .
+
+# Diagnose configuration (prints JSON, no MCP traffic)
+docker run --rm -e HEVY_API_KEY=<your-key> hevy-mcp --check
+
+# Run the server (read-only by default)
+docker run -i --rm -e HEVY_API_KEY -v hevy-audit:/data hevy-mcp
+```
+
+- Pass the key by name (`-e HEVY_API_KEY`) so it is read from your shell rather than written into the command line, or use `--env-file hevy-mcp/.env`. The `.env` file is excluded from the image by `.dockerignore`.
+- Any setting from the table below works with `-e`, e.g. `-e HEVY_ENABLE_WRITES=1`.
+- Verify the audit chain: `docker run --rm -v hevy-audit:/data --entrypoint node hevy-mcp verify-audit.mjs /data/audit.log`
+- To use it from VS Code, register it in `.mcp.json` instead of the `node` command:
+
+```json
+{
+  "mcpServers": {
+    "hevy": {
+      "type": "stdio",
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "-e", "HEVY_API_KEY", "-v", "hevy-audit:/data", "hevy-mcp"],
+      "env": { "HEVY_API_KEY": "${input:hevy-api-key}" }
+    }
+  }
+}
+```
+
+  Define a matching `inputs` entry (`promptString`, `password: true`) so the key is prompted for rather than stored. Keep the existing `node` entry if you prefer to run locally.
+
 ## Configuration
 
 All settings are environment variables (set in `hevy-mcp/.env`).
